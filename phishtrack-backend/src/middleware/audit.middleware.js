@@ -1,0 +1,67 @@
+const prisma = require('../prismaClient');
+
+module.exports = (actionOverride) => {
+  return async (req, res, next) => {
+    res.on('finish', async () => {
+      try {
+        const isMutation = ['POST', 'PUT', 'DELETE'].includes(req.method);
+        const isAuth = req.originalUrl.includes('/api/auth');
+        
+        if (isMutation || isAuth) {
+          const userId = req.user?.userId || null;
+          let caseId = req.params.caseId || req.params.id || req.body.caseId || null;
+          
+          // Validate UUID structure for caseId
+          const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+          if (caseId && !uuidRegex.test(caseId)) {
+            caseId = null;
+          }
+
+          let action = actionOverride || `${req.method} ${req.originalUrl}`;
+          
+          // Beautify actions based on path
+          if (req.originalUrl.startsWith('/api/cases')) {
+            if (req.method === 'POST') action = 'CASE_CREATED';
+            else if (req.method === 'PUT') action = 'CASE_UPDATED';
+            else if (req.method === 'DELETE') action = 'CASE_DELETED';
+          } else if (req.originalUrl.startsWith('/api/analysis/run')) {
+            action = 'CASE_ANALYSIS_TRIGGERED';
+          } else if (req.originalUrl.startsWith('/api/reports/generate')) {
+            action = 'REPORT_GENERATION_TRIGGERED';
+          } else if (req.originalUrl.startsWith('/api/auth/login')) {
+            action = 'USER_LOGIN_ATTEMPT';
+          } else if (req.originalUrl.startsWith('/api/auth/verify-otp')) {
+            action = 'USER_LOGIN_SUCCESS';
+          } else if (req.originalUrl.startsWith('/api/auth/register')) {
+            action = 'USER_REGISTRATION';
+          }
+
+          // Prepare metadata without sensitive values (e.g. passwords)
+          const bodyMetadata = { ...req.body };
+          if (bodyMetadata.password) bodyMetadata.password = '***';
+          if (bodyMetadata.otp) bodyMetadata.otp = '***';
+
+          await prisma.auditLog.create({
+            data: {
+              userId,
+              caseId,
+              action,
+              ip_address: req.ip || req.headers['x-forwarded-for'] || null,
+              device_id: req.headers['x-device-id'] || req.user?.deviceId || null,
+              metadata: {
+                method: req.method,
+                url: req.originalUrl,
+                status: res.statusCode,
+                query: req.query,
+                body: req.method !== 'GET' ? bodyMetadata : undefined
+              }
+            }
+          });
+        }
+      } catch (err) {
+        console.error('Audit middleware logging error:', err);
+      }
+    });
+    next();
+  };
+};

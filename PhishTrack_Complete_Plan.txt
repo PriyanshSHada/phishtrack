@@ -1,0 +1,735 @@
+
+================================================================
+         PHISHTRACK — COMPLETE PROFESSIONAL PROJECT PLAN
+         Phishing Link Investigation & Forensic Reporting Tool
+================================================================
+
+Author        : Priyansh Singh Hada
+Version       : 1.0
+Date          : June 2025
+Target        : Android App + Backend (Render)
+Certifications: CHFI / CEH Aligned
+
+
+================================================================
+1. PROJECT OVERVIEW
+================================================================
+
+App Name      : PhishTrack
+Type          : Android Mobile App + REST Backend
+Purpose       : Phishing Link Investigation & Forensic Reporting
+Target Users  : Cybersecurity Analysts, CHFI/CEH Professionals, Students
+Backend Host  : Render.com
+Database      : PostgreSQL
+
+
+================================================================
+2. COMPLETE ARCHITECTURE
+================================================================
+
+[ ANDROID APP (Kotlin + Jetpack Compose) ]
+         Auth | Cases | Analysis | Reports | PDF
+                        |
+                  HTTPS + JWT
+                        |
+[ BACKEND API (Node.js + Express) — Render.com ]
+         |                |               |
+   PostgreSQL         Docker           Redis
+     (Main DB)       Sandbox          (Cache)
+                        |
+         ┌──────────────────────────────┐
+         |        EXTERNAL APIs         |
+         |  OpenAI GPT-4o               |
+         |  VirusTotal API v3           |
+         |  WHOIS lookup                |
+         |  IPGeolocation API           |
+         |  SendGrid (Email OTP)        |
+         |  SSL Labs / ssl-checker      |
+         └──────────────────────────────┘
+
+
+================================================================
+3. DATABASE SCHEMA
+================================================================
+
+--- USERS TABLE ---
+  id              UUID (Primary Key)
+  name            VARCHAR
+  email           VARCHAR (unique)
+  password        VARCHAR (bcrypt hashed)
+  analyst_id      VARCHAR (auto: PSH-001)
+  organization    VARCHAR
+  role            ENUM (analyst / admin)
+  device_id       VARCHAR (device binding)
+  is_verified     BOOLEAN
+  created_at      TIMESTAMP
+  last_login      TIMESTAMP
+
+--- CASES TABLE ---
+  id              UUID (Primary Key)
+  case_number     VARCHAR (auto: CASE-2025-001)
+  user_id         UUID (Foreign Key → users)
+  url             TEXT (phishing link)
+  description     TEXT
+  source          ENUM (WhatsApp / Email / SMS / Other)
+  priority        ENUM (Low / Medium / High / Critical)
+  status          ENUM (Open / Investigating / Closed)
+  tags            TEXT[]
+  created_at      TIMESTAMP
+  updated_at      TIMESTAMP
+
+--- ANALYSIS TABLE ---
+  id              UUID (Primary Key)
+  case_id         UUID (Foreign Key → cases)
+  threat_score    INTEGER (0-100)
+  severity        ENUM (Low / Medium / High / Critical)
+  whois_data      JSONB
+  ip_geolocation  JSONB
+  ssl_info        JSONB
+  redirect_chain  TEXT[]
+  virustotal_result JSONB
+  page_screenshot TEXT (base64 / Cloudinary URL)
+  page_source_hash VARCHAR (SHA-256)
+  ai_summary      TEXT
+  ai_indicators   TEXT[]
+  ai_techniques   TEXT[]
+  analyzed_at     TIMESTAMP
+  sandbox_version VARCHAR
+
+--- REPORTS TABLE ---
+  id              UUID (Primary Key)
+  case_id         UUID (Foreign Key → cases)
+  version         INTEGER (1, 2, 3...)
+  pdf_url         TEXT
+  digital_signature TEXT (SHA-256 hash)
+  generated_by    UUID (Foreign Key → users)
+  generated_at    TIMESTAMP
+  is_tampered     BOOLEAN (default: false)
+
+--- AUDIT LOGS TABLE ---
+  id              UUID (Primary Key)
+  user_id         UUID (Foreign Key → users)
+  case_id         UUID (Foreign Key → cases)
+  action          VARCHAR (CASE_CREATED / ANALYZED / REPORT_GENERATED...)
+  ip_address      VARCHAR
+  device_id       VARCHAR
+  timestamp       TIMESTAMP
+  metadata        JSONB
+
+--- CHAIN OF CUSTODY TABLE ---
+  id              UUID (Primary Key)
+  case_id         UUID (Foreign Key → cases)
+  user_id         UUID (Foreign Key → users)
+  action          VARCHAR
+  timestamp       TIMESTAMP
+  hash_before     VARCHAR (SHA-256)
+  hash_after      VARCHAR (SHA-256)
+
+
+================================================================
+4. BACKEND API ENDPOINTS
+================================================================
+
+--- AUTH ---
+  POST   /api/auth/register          Register new analyst
+  POST   /api/auth/login             Login + send OTP
+  POST   /api/auth/verify-otp        Verify OTP → return JWT
+  POST   /api/auth/resend-otp        Resend OTP email
+  POST   /api/auth/logout            Invalidate token
+  GET    /api/auth/me                Get current user profile
+
+--- CASES ---
+  GET    /api/cases                  Get all cases (with filters)
+  POST   /api/cases                  Create new case
+  GET    /api/cases/:id              Get single case detail
+  PUT    /api/cases/:id              Update case info/status
+  DELETE /api/cases/:id              Delete case
+  GET    /api/cases/:id/timeline     Get case activity timeline
+
+--- ANALYSIS ---
+  POST   /api/analysis/run           Trigger full analysis on URL
+  GET    /api/analysis/:caseId       Get analysis results
+  GET    /api/analysis/:caseId/screenshot  Get page screenshot
+
+--- REPORTS ---
+  POST   /api/reports/generate/:caseId   Generate PDF report
+  GET    /api/reports/:caseId            Get report for case
+  GET    /api/reports/:id/pdf            Download PDF
+  GET    /api/reports/:id/verify         Verify digital signature
+
+--- DASHBOARD ---
+  GET    /api/dashboard/stats        Total/Open/Closed/Critical counts
+  GET    /api/dashboard/recent-cases Last 5 cases
+  GET    /api/dashboard/threat-map   IP geo data for map
+  GET    /api/dashboard/weekly-graph Cases per week (last 8 weeks)
+
+--- AUDIT ---
+  GET    /api/audit/logs             All audit logs (admin)
+  GET    /api/audit/custody/:caseId  Chain of custody for a case
+
+
+================================================================
+5. ANALYSIS ENGINE — STEP BY STEP FLOW
+================================================================
+
+Step 1: User submits phishing URL from Android app
+
+Step 2: Backend receives POST /api/analysis/run
+        → Validates URL format
+        → Checks against blocklist
+        → Logs action in audit_logs
+
+Step 3: Run 6 checks IN PARALLEL:
+
+        [1] WHOIS Lookup
+            → Domain registration date
+            → Registrar info
+            → Owner country
+            → Expiry date
+            → Flag: domain < 30 days old = suspicious
+
+        [2] IP Geolocation
+            → Resolve domain to IP
+            → Get country, city, ISP
+            → Flag: hosted in known abuse countries
+
+        [3] SSL Certificate Check
+            → Is SSL present?
+            → Is it self-signed?
+            → Is it expired?
+            → Does domain match cert?
+
+        [4] VirusTotal API Scan
+            → Check URL against 70+ antivirus engines
+            → Get malicious / suspicious / clean counts
+            → Get detection names
+
+        [5] Docker Sandbox → Puppeteer
+            → Launch isolated Docker container
+            → Puppeteer opens URL in headless Chrome
+            → Capture: full page screenshot
+            → Capture: complete HTML source
+            → Detect: login forms / password fields
+            → Trace: full redirect chain
+            → Hash page source (SHA-256)
+            → Destroy container after 10 seconds
+
+        [6] Similar Domain Detection
+            → Compare to top 1000 brand domains
+            → Levenshtein distance check
+            → Flag: "Looks like hdfc.com"
+
+Step 4: Combine all results
+        → Send to GPT-4o API with system prompt:
+          "You are a professional phishing analyst.
+           Analyze the following data and return a
+           structured JSON report with threat score,
+           severity, indicators, techniques, and summary."
+
+Step 5: GPT-4o returns:
+        → threat_score (0-100)
+        → severity (Low/Medium/High/Critical)
+        → indicators[] (list of suspicious signs)
+        → techniques[] (typosquatting, form hijacking, etc.)
+        → ai_summary (human-readable paragraph)
+
+Step 6: Save all results to analysis table
+        → Update case status to "Investigating"
+        → Log in chain_of_custody
+        → Return complete result to Android app
+
+
+================================================================
+6. DOCKER SANDBOX — SAFETY CONFIGURATION
+================================================================
+
+Container Settings:
+  Base image        : node:18-alpine + chromium
+  Network mode      : bridge (isolated)
+  Read-only FS      : true (no writes to host)
+  Memory limit      : 256MB
+  CPU limit         : 0.5 cores
+  Execution timeout : 10 seconds max
+  Auto-destroy      : container killed after each run
+
+Safety Checks Before Launch:
+  → URL must start with http:// or https://
+  → Domain checked against blocklist (known malware)
+  → IP range check (block private IPs: 192.168.x.x etc.)
+  → Max redirects: 5
+
+What Puppeteer Collects:
+  → Full page HTML source
+  → Screenshot (PNG, full page)
+  → All form elements and input types
+  → All redirect URLs in chain
+  → Final landing URL
+  → Page title and meta tags
+
+
+================================================================
+7. ANDROID APP — ALL SCREENS
+================================================================
+
+--- NAVIGATION FLOW ---
+
+  Splash Screen
+       ↓
+  Login Screen → OTP Verify Screen → Dashboard
+       ↓
+  Sign Up Screen → OTP Verify Screen → Dashboard
+
+  Bottom Navigation:
+  [Home] [Cases] [+ New] [Reports] [Profile]
+
+--- SCREEN 1: SPLASH SCREEN ---
+  - Black background
+  - Glowing shield logo with cyan pulse animation
+  - App name: PhishTrack
+  - Tagline: "Forensic Link Analyzer"
+  - Loading progress bar (cyan glow)
+
+--- SCREEN 2: LOGIN SCREEN ---
+  - Dark bg with subtle hex grid pattern
+  - PhishTrack logo at top
+  - Email input field (cyan border on focus)
+  - Password input field (show/hide toggle)
+  - LOGIN button (cyan filled, glow shadow)
+  - "Don't have account? Sign Up" link
+  - Biometric login button (fingerprint icon)
+
+--- SCREEN 3: SIGN UP SCREEN ---
+  - Full Name input
+  - Email input
+  - Organization input (optional)
+  - Password input
+  - Confirm Password input
+  - REGISTER button
+  - "Already have account? Login" link
+
+--- SCREEN 4: OTP VERIFY SCREEN ---
+  - "Check your email" heading
+  - Masked email shown (pri***@gmail.com)
+  - 6-box OTP input (auto-focus next box)
+  - Countdown timer (Resend in 0:45)
+  - Resend OTP link
+  - VERIFY button
+
+--- SCREEN 5: DASHBOARD ---
+  - Greeting: "Hello, Priyansh 👋"
+  - Stats row (4 cards):
+      Total Cases | Open | Closed | Critical
+  - Threat Map (Google Maps with IP location dots)
+  - Weekly graph (cases per week bar chart)
+  - Recent Cases list (last 5 cases)
+  - Floating Action Button [+] (cyan glow)
+
+--- SCREEN 6: CASES LIST SCREEN ---
+  - Search bar at top
+  - Filter chips: [All] [Open] [Closed] [High] [Critical]
+  - Sort by: Date / Priority / Status
+  - Case cards list:
+      Case number | Threat badge | URL | Date | Status
+
+--- SCREEN 7: NEW CASE SCREEN ---
+  - Auto-generated case number shown (CASE-2025-003)
+  - URL input field with paste button
+  - Description text area
+  - Source selector chips: [WhatsApp] [Email] [SMS] [Other]
+  - Priority selector: [Low] [Medium] [High] [Critical]
+  - Tags input (optional)
+  - ANALYZE LINK button (cyan, full width)
+
+--- SCREEN 8: ANALYSIS LOADING SCREEN ---
+  - Animated scanning circle (cyan rotation)
+  - "Analyzing link safely..."
+  - Live step progress:
+      ✅ Sandbox initialized
+      ✅ Fetching page source
+      ✅ Running WHOIS lookup
+      ✅ Checking VirusTotal
+      ⏳ Running AI analysis...
+      ⏳ Generating report...
+  - Safety message: "Link is isolated. Your device is safe."
+
+--- SCREEN 9: REPORT SCREEN ---
+  - Case header (case number + URL)
+  - Threat Score ring (animated circular progress, 0-100)
+  - Severity badge (colored: RED/ORANGE/GREEN)
+  - AI Summary paragraph
+  - Indicators found (list with warning icons)
+  - Techniques used (tags/chips)
+  - WHOIS section (collapsible):
+      Domain age | Registrar | Country | Expiry
+  - IP Geolocation section (collapsible):
+      IP | Country | City | ISP | Map pin
+  - SSL Certificate section (collapsible):
+      Valid? | Self-signed? | Expiry | Match?
+  - VirusTotal section (collapsible):
+      X/70 engines detected | Engine names
+  - Redirect Chain (collapsible):
+      URL 1 → URL 2 → URL 3 (final)
+  - Page Screenshot (tap to expand)
+  - Bottom action bar:
+      [📄 Save as PDF] [📧 Share] [🔒 Close Case]
+
+--- SCREEN 10: CASE DETAIL SCREEN ---
+  - Full case info (all fields)
+  - Status update button
+  - Case Timeline:
+      Case Created → Analysis Run → Report Generated → Closed
+  - Chain of Custody log table:
+      Timestamp | Action | Analyst | Hash
+
+--- SCREEN 11: PROFILE SCREEN ---
+  - Analyst ID Card (name, analyst ID, org, role)
+  - Stats: Cases Solved | Reports Generated
+  - Settings section:
+      Change Password
+      Notification Settings
+      Biometric Login toggle
+      Dark/Light Mode toggle
+      App PIN Lock
+  - Export All Cases (CSV)
+  - Logout button
+
+
+================================================================
+8. GUI DESIGN SYSTEM
+================================================================
+
+--- COLOR PALETTE ---
+  Background       #0A0E1A   Deep Navy (main bg)
+  Card Background  #141829   Dark card
+  Input Background #1E2440   Input fields
+  Primary/Accent   #00F5FF   Cyan (buttons, highlights)
+  Danger           #FF3B3B   High threat / Critical
+  Warning          #FFA500   Medium threat
+  Success          #00FF88   Safe / Closed cases
+  Info             #4A9EFF   Info / Low threat
+  Text Primary     #FFFFFF   Main text
+  Text Secondary   #8892B0   Subtext / labels
+  Border           #2A3558   Card borders
+
+--- TYPOGRAPHY ---
+  Display / Headers  : JetBrains Mono Bold
+  Body Text          : Nunito Regular
+  Data / Numbers     : JetBrains Mono Regular
+  Labels / Captions  : Nunito Light
+
+--- UI COMPONENTS ---
+  Cards         : Glassmorphism (background blur + border 15% opacity)
+  Buttons       : Cyan fill + box shadow glow (0 0 12px #00F5FF)
+  Input Fields  : Dark bg + cyan border on focus + rounded corners
+  Threat Badges : Colored pill chips (Red/Orange/Green/Blue)
+  Progress Ring : Animated circular indicator (threat score)
+  Icons         : Outlined style with cyan tint
+  Bottom Nav    : Dark frosted bar with cyan active indicator
+
+--- ANIMATIONS ---
+  Splash        : Shield pulse + fade in
+  Loading       : Rotating scanner circle
+  Cards         : Fade + slide up on load
+  Progress ring : Animated fill on report screen
+  Buttons       : Scale + glow on press
+  OTP boxes     : Bounce on fill
+
+
+================================================================
+9. COMPLETE TECH STACK
+================================================================
+
+--- ANDROID ---
+  Language          : Kotlin
+  UI Framework      : Jetpack Compose
+  HTTP Client       : Retrofit2 + OkHttp
+  Local Database    : Room Database
+  Auth Storage      : EncryptedSharedPreferences
+  PDF Generation    : iTextPDF / Android PdfDocument
+  Charts            : Vico / MPAndroidChart
+  Maps              : Google Maps SDK
+  Biometric Auth    : AndroidX Biometric
+  Image Loading     : Coil
+  Navigation        : Jetpack Navigation Component
+  DI                : Hilt (Dependency Injection)
+  Architecture      : MVVM + Repository Pattern
+
+--- BACKEND ---
+  Runtime           : Node.js v18+
+  Framework         : Express.js
+  Database          : PostgreSQL (via Supabase or Railway)
+  ORM               : Prisma
+  Cache             : Redis (Upstash free tier)
+  Auth              : JWT + bcrypt
+  Email             : SendGrid
+  Sandbox           : Puppeteer + Docker
+  WHOIS             : whois npm package
+  IP Geolocation    : ip-api.com (free)
+  SSL Check         : ssl-checker npm
+  Virus Scan        : VirusTotal API v3
+  AI Analysis       : OpenAI GPT-4o API
+  File Storage      : Cloudinary (screenshots)
+  Hosting           : Render.com
+
+--- EXTERNAL APIs ---
+  OpenAI GPT-4o     : Link analysis + report generation
+  VirusTotal v3     : URL malware scanning (free: 4 req/min)
+  ip-api.com        : IP geolocation (free: 45 req/min)
+  SendGrid          : Email OTP delivery
+  Cloudinary        : Screenshot storage (free tier)
+  Google Maps       : Threat map in Android app
+
+
+================================================================
+10. DEVELOPMENT PHASES
+================================================================
+
+--- PHASE 1: FOUNDATION (Week 1-2) ---
+  Backend:
+    ✦ Initialize Node.js + Express project
+    ✦ Setup PostgreSQL + Prisma schema
+    ✦ Build Auth APIs (register, login, OTP, JWT)
+    ✦ Build Cases CRUD APIs
+    ✦ Setup SendGrid email OTP
+
+  Android:
+    ✦ Create Kotlin project with Jetpack Compose
+    ✦ Setup Retrofit + Hilt
+    ✦ Build Splash screen
+    ✦ Build Login screen
+    ✦ Build OTP Verify screen
+    ✦ Build Sign Up screen
+    ✦ Build basic Dashboard screen
+
+--- PHASE 2: ANALYSIS ENGINE (Week 3-4) ---
+  Backend:
+    ✦ Setup Docker + Puppeteer sandbox
+    ✦ Integrate WHOIS lookup
+    ✦ Integrate IP Geolocation
+    ✦ Integrate SSL certificate check
+    ✦ Integrate VirusTotal API
+    ✦ Build similar domain detection
+    ✦ Integrate OpenAI GPT-4o (prompt engineering)
+    ✦ Build parallel analysis orchestrator
+    ✦ Save analysis results to DB
+
+--- PHASE 3: ANDROID CORE (Week 5-6) ---
+  Android:
+    ✦ New Case screen
+    ✦ Analysis Loading screen (live steps)
+    ✦ Report screen (full detail view)
+    ✦ Cases List screen (search + filter)
+    ✦ Case Detail + Timeline screen
+    ✦ PDF generation (iTextPDF)
+    ✦ Share report via email
+
+--- PHASE 4: PROFESSIONAL FEATURES (Week 7-8) ---
+  Backend:
+    ✦ Chain of custody logging
+    ✦ Audit log system
+    ✦ Digital signature on reports (SHA-256)
+    ✦ Report tamper detection
+    ✦ Report versioning
+
+  Android:
+    ✦ Biometric login
+    ✦ App PIN lock
+    ✦ Threat map (Google Maps)
+    ✦ Dashboard charts (Vico)
+    ✦ Offline support (Room DB sync)
+    ✦ Chain of custody UI
+    ✦ Analyst ID card on Profile
+
+--- PHASE 5: POLISH & DEPLOY (Week 9-10) ---
+    ✦ Full UI animation pass
+    ✦ Error handling + empty states
+    ✦ Loading states for all screens
+    ✦ Input validation everywhere
+    ✦ Backend deploy on Render
+    ✦ APK build + end-to-end testing
+    ✦ README documentation
+    ✦ API documentation (Postman collection)
+
+
+================================================================
+11. FOLDER STRUCTURE
+================================================================
+
+--- BACKEND ---
+phishtrack-backend/
+├── src/
+│   ├── controllers/
+│   │   ├── auth.controller.js
+│   │   ├── cases.controller.js
+│   │   ├── analysis.controller.js
+│   │   ├── reports.controller.js
+│   │   └── dashboard.controller.js
+│   ├── routes/
+│   │   ├── auth.routes.js
+│   │   ├── cases.routes.js
+│   │   ├── analysis.routes.js
+│   │   ├── reports.routes.js
+│   │   └── dashboard.routes.js
+│   ├── middleware/
+│   │   ├── auth.middleware.js
+│   │   ├── rateLimit.middleware.js
+│   │   └── audit.middleware.js
+│   ├── services/
+│   │   ├── sandbox/
+│   │   │   ├── docker.service.js
+│   │   │   └── puppeteer.service.js
+│   │   ├── analysis/
+│   │   │   ├── whois.service.js
+│   │   │   ├── ipgeo.service.js
+│   │   │   ├── ssl.service.js
+│   │   │   ├── virustotal.service.js
+│   │   │   └── domainCheck.service.js
+│   │   ├── ai/
+│   │   │   └── openai.service.js
+│   │   └── email/
+│   │       └── sendgrid.service.js
+│   ├── models/
+│   │   └── prisma/
+│   │       └── schema.prisma
+│   └── utils/
+│       ├── hash.util.js
+│       ├── caseNumber.util.js
+│       └── signature.util.js
+├── docker/
+│   └── sandbox/
+│       └── Dockerfile
+├── prisma/
+│   └── schema.prisma
+├── .env
+├── .env.example
+└── package.json
+
+--- ANDROID ---
+PhishTrack/
+└── app/src/main/
+    ├── ui/
+    │   ├── auth/
+    │   │   ├── LoginScreen.kt
+    │   │   ├── SignUpScreen.kt
+    │   │   ├── OtpVerifyScreen.kt
+    │   │   └── AuthViewModel.kt
+    │   ├── dashboard/
+    │   │   ├── DashboardScreen.kt
+    │   │   └── DashboardViewModel.kt
+    │   ├── cases/
+    │   │   ├── CasesListScreen.kt
+    │   │   ├── CaseDetailScreen.kt
+    │   │   └── CasesViewModel.kt
+    │   ├── newcase/
+    │   │   ├── NewCaseScreen.kt
+    │   │   └── NewCaseViewModel.kt
+    │   ├── analysis/
+    │   │   ├── AnalysisLoadingScreen.kt
+    │   │   └── AnalysisViewModel.kt
+    │   ├── report/
+    │   │   ├── ReportScreen.kt
+    │   │   ├── ReportViewModel.kt
+    │   │   └── PdfGenerator.kt
+    │   └── profile/
+    │       ├── ProfileScreen.kt
+    │       └── ProfileViewModel.kt
+    ├── data/
+    │   ├── api/
+    │   │   ├── ApiService.kt
+    │   │   └── ApiClient.kt
+    │   ├── local/
+    │   │   ├── AppDatabase.kt
+    │   │   ├── CaseDao.kt
+    │   │   └── entities/
+    │   └── repository/
+    │       ├── AuthRepository.kt
+    │       ├── CasesRepository.kt
+    │       └── AnalysisRepository.kt
+    ├── di/
+    │   └── AppModule.kt
+    └── utils/
+        ├── BiometricHelper.kt
+        ├── TokenManager.kt
+        └── PdfHelper.kt
+
+
+================================================================
+12. PROFESSIONAL FEATURES CHECKLIST
+================================================================
+
+  [✦] Email OTP Authentication
+  [✦] JWT + Device Binding
+  [✦] Biometric Login (fingerprint/face)
+  [✦] Session Timeout (auto logout)
+  [✦] App PIN Lock
+  [✦] Docker Isolated Sandbox
+  [✦] WHOIS Domain Lookup
+  [✦] IP Geolocation with Map
+  [✦] SSL Certificate Validation
+  [✦] VirusTotal API (70+ engines)
+  [✦] Redirect Chain Tracing
+  [✦] Similar Domain Detection
+  [✦] Page Screenshot Evidence
+  [✦] GPT-4o AI Analysis
+  [✦] Threat Score (0-100)
+  [✦] NIST-aligned Severity Levels
+  [✦] Chain of Custody Log
+  [✦] Audit Log System
+  [✦] Digital Signature on Reports
+  [✦] Report Tamper Detection
+  [✦] Report Versioning
+  [✦] PDF Export with Logo
+  [✦] Share Report via Email
+  [✦] Threat Map (World Map)
+  [✦] Dashboard Analytics Charts
+  [✦] Case Priority & Tags
+  [✦] Case Timeline View
+  [✦] Search & Filter Cases
+  [✦] Offline Support (Room DB)
+  [✦] Bulk CSV Export
+
+
+================================================================
+13. RISK & MITIGATION
+================================================================
+
+  RISK: Malware/exploit from phishing site
+  SOLUTION: Docker container fully isolated, auto-destroyed after run,
+            no persistent storage, no host network access
+
+  RISK: OpenAI API cost overrun
+  SOLUTION: Cache results for repeated URLs (Redis 24hr TTL),
+            limit 10 free analyses per user per day
+
+  RISK: VirusTotal rate limit (4 req/min free)
+  SOLUTION: Cache VT results in DB for 24 hours per URL
+
+  RISK: Report tampering / evidence integrity
+  SOLUTION: SHA-256 hash of report at generation, stored separately,
+            verify endpoint checks hash on demand
+
+  RISK: App used offline
+  SOLUTION: Room Database caches all cases locally, syncs on reconnect
+
+  RISK: Legal issues with phishing analysis tool
+  SOLUTION: Tool is analysis-only, no attack capability, clearly
+            labeled as forensic investigation tool
+
+
+================================================================
+14. WHY THIS PROJECT STANDS OUT
+================================================================
+
+  ✦ Real-world forensic tool actual analysts use in practice
+  ✦ CHFI concepts: chain of custody, evidence integrity, audit logs
+  ✦ CEH concepts: phishing analysis, sandboxing, recon techniques
+  ✦ Industry standard APIs: VirusTotal, WHOIS, GPT-4o
+  ✦ Production architecture: Docker, Redis, JWT, PostgreSQL
+  ✦ Court-admissible report format with digital signatures
+  ✦ Full-stack project: Android + Node.js backend + multiple APIs
+  ✦ Ethical and legal: analysis only, no attack vectors
+  ✦ Strong portfolio piece for forensic analyst / pen tester roles
+
+================================================================
+                    END OF PLAN — PhishTrack v1.0
+================================================================

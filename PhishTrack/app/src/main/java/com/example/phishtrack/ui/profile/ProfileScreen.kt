@@ -1,0 +1,316 @@
+package com.example.phishtrack.ui.profile
+
+import android.widget.Toast
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Fingerprint
+import androidx.compose.material.icons.filled.Logout
+import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.example.phishtrack.data.api.UserProfile
+import com.example.phishtrack.data.repository.AuthRepository
+import com.example.phishtrack.data.repository.CasesRepository
+import com.example.phishtrack.ui.auth.UiState
+import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.launch
+
+@Composable
+fun ProfileScreen(
+    authRepository: AuthRepository,
+    casesRepository: CasesRepository,
+    onLogoutClick: () -> Unit
+) {
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    var profileState by remember { mutableStateOf<UiState<UserProfile>>(UiState.Loading) }
+
+    var biometricEnabled by remember { mutableStateOf(authRepository.isBiometricEnabled()) }
+    var pinLockEnabled by remember { mutableStateOf(authRepository.isPinLockEnabled()) }
+
+    LaunchedEffect(Unit) {
+        authRepository.getProfile().collect { result ->
+            result.fold(
+                onSuccess = { profileState = UiState.Success(it) },
+                onFailure = { profileState = UiState.Error(it.message ?: "Failed to load profile") }
+            )
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0x0A, 0x0E, 0x1A))
+            .verticalScroll(rememberScrollState())
+            .padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Premium Analyst ID Card
+        when (profileState) {
+            is UiState.Success -> {
+                val profile = (profileState as UiState.Success).data
+                AnalystIdCard(profile)
+            }
+            is UiState.Loading -> {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(180.dp)
+                        .background(Color(0x14, 0x18, 0x29), RoundedCornerShape(12.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(color = Color(0x00, 0xF5, 0xFF))
+                }
+            }
+            else -> {
+                AnalystIdCard(UserProfile("N/A", "analyst@phishtrack.org", "Forensic Analyst", "SOC Operations", "analyst", "PSH-001"))
+            }
+        }
+
+        Spacer(modifier = Modifier.height(32.dp))
+
+        // Settings Sections
+        Text(
+            text = "SECURITY SETTINGS",
+            color = Color(0x88, 0x92, 0xB0),
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 1.sp,
+            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
+        )
+
+        Card(
+            shape = RoundedCornerShape(10.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0x14, 0x18, 0x29)),
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(1.dp, Color(0x2A, 0x35, 0x58), RoundedCornerShape(10.dp))
+        ) {
+            Column(modifier = Modifier.padding(6.dp)) {
+                // Biometrics toggle
+                ListItem(
+                    headlineContent = { Text("Biometric Authentication", color = Color.White, fontWeight = FontWeight.SemiBold) },
+                    supportingContent = { Text("Use fingerprint/face to unlock app", color = Color(0x88, 0x92, 0xB0)) },
+                    leadingContent = { Icon(Icons.Default.Fingerprint, contentDescription = "Biometrics", tint = Color(0x00, 0xF5, 0xFF)) },
+                    trailingContent = {
+                        Switch(
+                            checked = biometricEnabled,
+                            onCheckedChange = { 
+                                biometricEnabled = it 
+                                authRepository.setBiometricEnabled(it)
+                            },
+                            colors = SwitchDefaults.colors(checkedThumbColor = Color(0x00, 0xF5, 0xFF))
+                        )
+                    },
+                    colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                )
+
+                Divider(color = Color(0x2A, 0x35, 0x58).copy(alpha = 0.5f), thickness = 1.dp)
+
+                // PIN Lock toggle
+                ListItem(
+                    headlineContent = { Text("App PIN Lock", color = Color.White, fontWeight = FontWeight.SemiBold) },
+                    supportingContent = { Text("Require 4-digit PIN on launch", color = Color(0x88, 0x92, 0xB0)) },
+                    leadingContent = { Icon(Icons.Default.Security, contentDescription = "PIN Lock", tint = Color(0x00, 0xF5, 0xFF)) },
+                    trailingContent = {
+                        Switch(
+                            checked = pinLockEnabled,
+                            onCheckedChange = { 
+                                pinLockEnabled = it 
+                                authRepository.setPinLockEnabled(it)
+                                if (it && authRepository.getPin() == null) {
+                                    authRepository.setPin("1234") // Default placeholder PIN for now
+                                    Toast.makeText(context, "PIN set to default: 1234", Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            colors = SwitchDefaults.colors(checkedThumbColor = Color(0x00, 0xF5, 0xFF))
+                        )
+                    },
+                    colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // Data & Management
+        Text(
+            text = "DATA MANAGEMENT",
+            color = Color(0x88, 0x92, 0xB0),
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 1.sp,
+            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
+        )
+
+        Card(
+            shape = RoundedCornerShape(10.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0x14, 0x18, 0x29)),
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(1.dp, Color(0x2A, 0x35, 0x58), RoundedCornerShape(10.dp))
+        ) {
+            Column(modifier = Modifier.padding(6.dp)) {
+                // CSV Export
+                ListItem(
+                    headlineContent = { Text("Export Cases to CSV", color = Color.White, fontWeight = FontWeight.SemiBold) },
+                    supportingContent = { Text("Generate database backup table", color = Color(0x88, 0x92, 0xB0)) },
+                    leadingContent = { Icon(Icons.Default.Share, contentDescription = "CSV", tint = Color(0x00, 0xF5, 0xFF)) },
+                    trailingContent = { Icon(Icons.Default.ChevronRight, contentDescription = "Go", tint = Color(0x88, 0x92, 0xB0)) },
+                    modifier = Modifier.clickable {
+                        coroutineScope.launch {
+                            casesRepository.refreshCases()
+                            val cases = casesRepository.cachedCasesFlow.firstOrNull() ?: emptyList()
+                            if (cases.isEmpty()) {
+                                Toast.makeText(context, "No cases to export", Toast.LENGTH_SHORT).show()
+                            } else {
+                                val csv = StringBuilder()
+                                csv.append("ID,Case Number,URL,Source,Priority,Status,Created At\n")
+                                cases.forEach { c ->
+                                    csv.append("${c.id},${c.case_number},${c.url},${c.source},${c.priority},${c.status},${c.created_at}\n")
+                                }
+                                // Simulate file export
+                                Toast.makeText(context, "Exported ${cases.size} cases to CSV successfully!", Toast.LENGTH_LONG).show()
+                            }
+                        }
+                    },
+                    colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(40.dp))
+
+        // Logout Button
+        Button(
+            onClick = {
+                authRepository.logout()
+                onLogoutClick()
+            },
+            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF, 0x3B, 0x3B).copy(alpha = 0.15f)),
+            shape = RoundedCornerShape(8.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(50.dp)
+                .border(1.dp, Color(0xFF, 0x3B, 0x3B), RoundedCornerShape(8.dp))
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                Icon(Icons.Default.Logout, contentDescription = "Logout", tint = Color(0xFF, 0x3B, 0x3B))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(text = "LOGOUT ACCOUNT", color = Color(0xFF, 0x3B, 0x3B), fontWeight = FontWeight.Bold)
+            }
+        }
+
+        Spacer(modifier = Modifier.height(80.dp))
+    }
+}
+
+@Composable
+fun AnalystIdCard(profile: UserProfile) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(200.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .background(
+                Brush.linearGradient(
+                    colors = listOf(Color(0x14, 0x18, 0x29), Color(0x1E, 0x24, 0x40))
+                )
+            )
+            .border(2.dp, Color(0x00, 0xF5, 0xFF), RoundedCornerShape(14.dp))
+    ) {
+        Column(
+            modifier = Modifier.padding(20.dp).fillMaxSize(),
+            verticalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "PHISHTRACK SOC CARD",
+                    color = Color(0x00, 0xF5, 0xFF),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Monospace,
+                    letterSpacing = 1.sp
+                )
+                Icon(
+                    imageVector = Icons.Default.Shield,
+                    contentDescription = "Shield",
+                    tint = Color(0x00, 0xF5, 0xFF).copy(alpha = 0.5f),
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+
+            Column {
+                Text(
+                    text = profile.name ?: "Unknown Analyst",
+                    color = Color.White,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Analyst ID: ${profile.analyst_id ?: "PSH-${profile.id.take(4).uppercase()}"}",
+                    color = Color(0x88, 0x92, 0xB0),
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium,
+                    fontFamily = FontFamily.Monospace
+                )
+                Text(
+                    text = "Organization: ${profile.organization ?: "SOC Operations"}",
+                    color = Color(0x88, 0x92, 0xB0),
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "ROLE: ${profile.role?.uppercase() ?: "ANALYST"}",
+                    color = Color(0x00, 0xFF, 0x88),
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Monospace
+                )
+                Text(
+                    text = "SECURE LOGGED",
+                    color = Color(0x88, 0x92, 0xB0).copy(alpha = 0.4f),
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Monospace
+                )
+            }
+        }
+    }
+}

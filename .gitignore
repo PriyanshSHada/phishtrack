@@ -1,0 +1,27 @@
+# Backend
+node_modules/
+.env
+.DS_Store
+dist/
+coverage/
+*.log
+phishtrack-backend/uploads/*
+!phishtrack-backend/uploads/.gitkeep
+
+# Android
+.gradle/
+build/
+captures/
+.externalNativeBuild/
+.cxx/
+local.properties
+.idea/
+*.iml
+*.hprof
+.kotlin/
+app/build/
+PhishTrack/build/
+PhishTrack/.gradle/
+PhishTrack/.kotlin/
+PhishTrack/local.properties
+PhishTrack/.idea/

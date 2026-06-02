@@ -1,0 +1,33 @@
+{
+  "name": "phishtrack-backend",
+  "version": "0.1.0",
+  "description": "Backend API for PhishTrack",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js",
+    "compose:up": "docker compose up -d",
+    "compose:down": "docker compose down"
+  },
+  "author": "Priyansh Singh Hada",
+  "license": "MIT",
+  "dependencies": {
+    "@prisma/client": "^5.22.0",
+    "bcrypt": "^5.1.1",
+    "dotenv": "^16.0.0",
+    "express": "^4.18.2",
+    "jsonwebtoken": "^9.0.2",
+    "pdfkit": "^0.18.0",
+    "puppeteer-core": "^25.1.0",
+    "redis": "^6.0.0",
+    "resend": "^4.0.0",
+    "whois": "^2.16.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.0",
+    "prisma": "^5.22.0"
+  },
+  "prisma": {
+    "schema": "./prisma/schema.prisma"
+  }
+}

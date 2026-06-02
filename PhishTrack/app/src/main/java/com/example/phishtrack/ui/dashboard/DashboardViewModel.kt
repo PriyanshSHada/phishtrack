@@ -1,0 +1,76 @@
+package com.example.phishtrack.ui.dashboard
+
+import androidx.compose.runtime.State
+import androidx.compose.runtime.mutableStateOf
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.example.phishtrack.data.api.CaseResponse
+import com.example.phishtrack.data.api.StatsResponse
+import com.example.phishtrack.data.api.ThreatLocation
+import com.example.phishtrack.data.api.WeeklyGraphData
+import com.example.phishtrack.data.repository.CasesRepository
+import com.example.phishtrack.ui.auth.UiState
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.launch
+import javax.inject.Inject
+
+@HiltViewModel
+class DashboardViewModel @Inject constructor(
+    private val casesRepository: CasesRepository
+) : ViewModel() {
+
+    private val _statsState = mutableStateOf<UiState<StatsResponse>>(UiState.Loading)
+    val statsState: State<UiState<StatsResponse>> = _statsState
+
+    private val _recentCasesState = mutableStateOf<UiState<List<CaseResponse>>>(UiState.Loading)
+    val recentCasesState: State<UiState<List<CaseResponse>>> = _recentCasesState
+
+    private val _threatMapState = mutableStateOf<UiState<List<ThreatLocation>>>(UiState.Loading)
+    val threatMapState: State<UiState<List<ThreatLocation>>> = _threatMapState
+
+    private val _weeklyGraphState = mutableStateOf<UiState<List<WeeklyGraphData>>>(UiState.Loading)
+    val weeklyGraphState: State<UiState<List<WeeklyGraphData>>> = _weeklyGraphState
+
+    fun loadDashboardData() {
+        _statsState.value = UiState.Loading
+        _recentCasesState.value = UiState.Loading
+        _threatMapState.value = UiState.Loading
+        _weeklyGraphState.value = UiState.Loading
+
+        viewModelScope.launch {
+            casesRepository.getStats().collect { result ->
+                result.fold(
+                    onSuccess = { _statsState.value = UiState.Success(it) },
+                    onFailure = { _statsState.value = UiState.Error(it.message ?: "Failed to load stats") }
+                )
+            }
+        }
+
+        viewModelScope.launch {
+            casesRepository.getRecentCases().collect { result ->
+                result.fold(
+                    onSuccess = { _recentCasesState.value = UiState.Success(it.take(5)) },
+                    onFailure = { _recentCasesState.value = UiState.Error(it.message ?: "Failed to load cases") }
+                )
+            }
+        }
+
+        viewModelScope.launch {
+            casesRepository.getThreatMap().collect { result ->
+                result.fold(
+                    onSuccess = { _threatMapState.value = UiState.Success(it) },
+                    onFailure = { _threatMapState.value = UiState.Error(it.message ?: "Failed to load threat map") }
+                )
+            }
+        }
+
+        viewModelScope.launch {
+            casesRepository.getWeeklyGraph().collect { result ->
+                result.fold(
+                    onSuccess = { _weeklyGraphState.value = UiState.Success(it) },
+                    onFailure = { _weeklyGraphState.value = UiState.Error(it.message ?: "Failed to load graph") }
+                )
+            }
+        }
+    }
+}

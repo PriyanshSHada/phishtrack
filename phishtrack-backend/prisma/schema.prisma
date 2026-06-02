@@ -1,0 +1,135 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String           @id @default(uuid())
+  name         String?
+  email        String           @unique
+  password     String
+  analyst_id   String?          @unique
+  organization String?
+  role         Role             @default(analyst)
+  device_id    String?
+  is_verified  Boolean          @default(false)
+  created_at   DateTime         @default(now())
+  last_login   DateTime?
+  auditLogs    AuditLog[]
+  cases        Case[]
+  custody      ChainOfCustody[]
+  reports      Report[]         @relation("reports_generated")
+}
+
+model Case {
+  id          String           @id @default(uuid())
+  case_number String           @unique
+  userId      String
+  url         String
+  description String?
+  source      Source
+  priority    Priority
+  status      Status           @default(Open)
+  tags        String[]
+  created_at  DateTime         @default(now())
+  updated_at  DateTime         @updatedAt
+  analyses    Analysis[]
+  auditLogs   AuditLog[]
+  user        User             @relation(fields: [userId], references: [id])
+  custody     ChainOfCustody[]
+  reports     Report[]
+}
+
+model Analysis {
+  id                String    @id @default(uuid())
+  caseId            String
+  threat_score      Int?
+  severity          Severity?
+  whois_data        Json?
+  ip_geolocation    Json?
+  ssl_info          Json?
+  redirect_chain    String[]
+  virustotal_result Json?
+  page_screenshot   String?
+  page_source_hash  String?
+  ai_summary        String?
+  ai_indicators     String[]
+  ai_techniques     String[]
+  analyzed_at       DateTime? @default(now())
+  sandbox_version   String?
+  case              Case      @relation(fields: [caseId], references: [id])
+}
+
+model Report {
+  id                String   @id @default(uuid())
+  caseId            String
+  version           Int      @default(1)
+  pdf_url           String?
+  digital_signature String?
+  generatedById     String
+  generated_at      DateTime @default(now())
+  is_tampered       Boolean  @default(false)
+  case              Case     @relation(fields: [caseId], references: [id])
+  generated_by      User     @relation("reports_generated", fields: [generatedById], references: [id])
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  userId     String?
+  caseId     String?
+  action     String
+  ip_address String?
+  device_id  String?
+  timestamp  DateTime @default(now())
+  metadata   Json?
+  case       Case?    @relation(fields: [caseId], references: [id])
+  user       User?    @relation(fields: [userId], references: [id])
+}
+
+model ChainOfCustody {
+  id          String   @id @default(uuid())
+  caseId      String
+  userId      String
+  action      String
+  timestamp   DateTime @default(now())
+  hash_before String?
+  hash_after  String?
+  case        Case     @relation(fields: [caseId], references: [id])
+  user        User     @relation(fields: [userId], references: [id])
+}
+
+enum Role {
+  analyst
+  admin
+}
+
+enum Source {
+  WhatsApp
+  Email
+  SMS
+  Other
+}
+
+enum Priority {
+  Low
+  Medium
+  High
+  Critical
+}
+
+enum Status {
+  Open
+  Investigating
+  Closed
+}
+
+enum Severity {
+  Low
+  Medium
+  High
+  Critical
+}
