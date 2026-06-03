@@ -1,7 +1,7 @@
 const prisma = require('../prismaClient');
 const { hashPassword, comparePassword } = require('../utils/hash.util');
 const { signJwt } = require('../utils/jwt.util');
-const resendService = require('../services/resend.service');
+const emailService = require('../services/email.service');
 const redisClient = require('../redisClient');
 
 exports.register = async (req, res, next) => {
@@ -49,7 +49,7 @@ exports.login = async (req, res, next) => {
     }
 
     // Send OTP email
-    await resendService.sendOtp(email, otp);
+    await emailService.sendOtp(email, otp);
 
     res.json({ message: 'OTP sent to email', email: user.email });
   } catch (err) {
@@ -117,3 +117,33 @@ exports.me = async (req, res, next) => {
     next(err);
   }
 };
+
+exports.resendOtp = async (req, res, next) => {
+  try {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ error: 'Missing email' });
+
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    // Generate 6-digit OTP code
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+    // Store in Redis (expiration: 5 minutes = 300 seconds)
+    if (redisClient.isOpen) {
+      await redisClient.setEx(`otp:${email}`, 300, otp);
+    } else {
+      console.error('Redis client is not open; unable to store OTP.');
+      throw new Error('Redis connection error');
+    }
+
+    // Send OTP email
+    await emailService.sendOtp(email, otp);
+
+    res.json({ message: 'OTP resent to email' });
+  } catch (err) {
+    console.error(err);
+    next(err);
+  }
+};
+

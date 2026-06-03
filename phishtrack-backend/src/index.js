@@ -22,7 +22,7 @@ if (!fs.existsSync(reportsDir)) {
 }
 
 // Startup environment checks
-const requiredEnv = ['RESEND_API_KEY', 'RESEND_FROM'];
+const requiredEnv = []; // Add 'SMTP_HOST', 'SMTP_USER', 'SMTP_PASS' here if you want to strictly enforce it
 const missing = requiredEnv.filter(k => !process.env[k] || String(process.env[k]).trim() === '');
 if (missing.length) {
   console.error(`Missing required environment variables: ${missing.join(', ')}.`);

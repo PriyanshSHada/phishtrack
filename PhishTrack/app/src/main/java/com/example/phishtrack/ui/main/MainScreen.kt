@@ -3,7 +3,7 @@ package com.example.phishtrack.ui.main
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Assignment
+import androidx.compose.material.icons.automirrored.filled.Assignment
 import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
@@ -17,6 +17,8 @@ import com.example.phishtrack.ui.cases.CasesListScreen
 import com.example.phishtrack.ui.dashboard.DashboardScreen
 import com.example.phishtrack.ui.dashboard.DashboardViewModel
 import com.example.phishtrack.ui.profile.ProfileScreen
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.withTimeout
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -32,11 +34,17 @@ fun MainScreen(
     var analystName by remember { mutableStateOf("SOC Analyst") }
 
     LaunchedEffect(Unit) {
-        authRepository.getProfile().collect { result ->
-            result.fold(
-                onSuccess = { analystName = it.name ?: "Analyst" },
-                onFailure = {}
-            )
+        try {
+            withTimeout(10_000L) {
+                authRepository.getProfile().collect { result ->
+                    result.fold(
+                        onSuccess = { analystName = it.name ?: "Analyst" },
+                        onFailure = {} // Keep default name on error
+                    )
+                }
+            }
+        } catch (_: TimeoutCancellationException) {
+            // Backend didn't respond in time — keep the default "SOC Analyst" name
         }
     }
 
@@ -61,7 +69,7 @@ fun MainScreen(
                 NavigationBarItem(
                     selected = selectedTab == 1,
                     onClick = { selectedTab = 1 },
-                    icon = { Icon(Icons.Default.Assignment, contentDescription = "Cases") },
+                    icon = { Icon(Icons.AutoMirrored.Filled.Assignment, contentDescription = "Cases") },
                     label = { Text("Cases") },
                     colors = NavigationBarItemDefaults.colors(
                         selectedIconColor = Color(0x00, 0xF5, 0xFF),

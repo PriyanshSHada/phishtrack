@@ -1,11 +1,11 @@
 package com.example.phishtrack
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.navigation3.runtime.entryProvider
+import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.rememberNavBackStack
-import androidx.navigation3.ui.NavDisplay
 import com.example.phishtrack.data.repository.AuthRepository
 import com.example.phishtrack.data.repository.CasesRepository
 import com.example.phishtrack.ui.analysis.AnalysisLoadingScreen
@@ -30,26 +30,25 @@ fun MainNavigation(
   // Start destination: Splash Screen
   val backStack = rememberNavBackStack(Splash)
 
-  NavDisplay(
-    backStack = backStack,
-    onBack = { backStack.removeLastOrNull() },
-    entryProvider =
-      entryProvider {
-        entry<Splash> {
+  BackHandler(enabled = backStack.size > 1) {
+      backStack.removeLastOrNull()
+  }
+
+  when (val destination = backStack.lastOrNull() ?: Splash) {
+        Splash -> {
           SplashScreen(
               tokenManager = tokenManager,
               onNavigateNext = { isLoggedIn ->
-                  backStack.removeLastOrNull() // Remove splash
                   if (isLoggedIn) {
-                      backStack.add(SecurityCheck)
+                      backStack.replaceTop(SecurityCheck)
                   } else {
-                      backStack.add(Login)
+                      backStack.replaceTop(Login)
                   }
               }
           )
         }
 
-        entry<Login> {
+        Login -> {
           val authViewModel: AuthViewModel = hiltViewModel()
           LoginScreen(
               viewModel = authViewModel,
@@ -57,8 +56,7 @@ fun MainNavigation(
               onLoginSuccess = { email, token, userId ->
                   if (token != null) {
                       // Test account direct login bypasses verification
-                      backStack.removeLastOrNull()
-                      backStack.add(Main)
+                      backStack.replaceTop(Main)
                   } else {
                       backStack.add(OtpVerify(email = email))
                   }
@@ -66,8 +64,7 @@ fun MainNavigation(
               onBiometricClick = {
                   // Quick bypass for biometric: log in directly to Main if session exists or test bypass
                   if (tokenManager.getToken() != null) {
-                      backStack.removeLastOrNull()
-                      backStack.add(Main)
+                      backStack.replaceTop(Main)
                   } else {
                       // Login via test account as biometric mock fallback
                       authViewModel.login("test@example.com", "Test@1234")
@@ -76,27 +73,25 @@ fun MainNavigation(
           )
         }
 
-        entry<SignUp> {
+        SignUp -> {
           val authViewModel: AuthViewModel = hiltViewModel()
           SignUpScreen(
               viewModel = authViewModel,
               onNavigateToLogin = { backStack.removeLastOrNull() },
               onRegisterSuccess = {
-                  backStack.removeLastOrNull()
-                  backStack.add(Login)
+                  backStack.replaceTop(Login)
               }
           )
         }
 
-        entry<OtpVerify> { key ->
+        is OtpVerify -> {
           val authViewModel: AuthViewModel = hiltViewModel()
           OtpVerifyScreen(
-              email = key.email,
+              email = destination.email,
               viewModel = authViewModel,
               onVerificationSuccess = { token, userId ->
                   backStack.removeLastOrNull() // Remove OtpVerify
-                  backStack.removeLastOrNull() // Remove Login
-                  backStack.add(Main)
+                  backStack.replaceTop(Main)
               },
               onBackToLogin = {
                   backStack.removeLastOrNull()
@@ -104,34 +99,31 @@ fun MainNavigation(
           )
         }
 
-        entry<SecurityCheck> {
+        SecurityCheck -> {
           SecurityCheckScreen(
               authRepository = authRepository,
               onSuccess = {
-                  backStack.removeLastOrNull()
-                  backStack.add(Main)
+                  backStack.replaceTop(Main)
               },
               onLogout = {
-                  backStack.removeLastOrNull()
-                  backStack.add(Login)
+                  backStack.replaceTop(Login)
               }
           )
         }
 
-        entry<Main> {
+        Main -> {
           MainScreen(
               authRepository = authRepository,
               casesRepository = casesRepository,
               onNewCaseClick = { backStack.add(NewCase) },
               onCaseClick = { caseId -> backStack.add(Report(caseId = caseId)) },
               onLogoutClick = {
-                  backStack.removeLastOrNull() // Remove Main
-                  backStack.add(Login)
+                  backStack.replaceTop(Login)
               }
           )
         }
 
-        entry<NewCase> {
+        NewCase -> {
           val coroutineScope = rememberCoroutineScope()
           NewCaseScreen(
               onBackClick = { backStack.removeLastOrNull() },
@@ -140,8 +132,7 @@ fun MainNavigation(
                       casesRepository.createCase(url, desc, src, priority, tags).collect { result ->
                           result.fold(
                               onSuccess = { caseResponse ->
-                                  backStack.removeLastOrNull() // Remove NewCase form
-                                  backStack.add(AnalysisLoading(caseId = caseResponse.id))
+                                  backStack.replaceTop(AnalysisLoading(caseId = caseResponse.id))
                               },
                               onFailure = {}
                           )
@@ -151,13 +142,12 @@ fun MainNavigation(
           )
         }
 
-        entry<AnalysisLoading> { key ->
+        is AnalysisLoading -> {
           AnalysisLoadingScreen(
-              caseId = key.caseId,
+              caseId = destination.caseId,
               casesRepository = casesRepository,
               onAnalysisComplete = { caseId ->
-                  backStack.removeLastOrNull() // Remove loading screen
-                  backStack.add(Report(caseId = caseId))
+                  backStack.replaceTop(Report(caseId = caseId))
               },
               onBackOnError = {
                   backStack.removeLastOrNull()
@@ -165,13 +155,23 @@ fun MainNavigation(
           )
         }
 
-        entry<Report> { key ->
+        is Report -> {
           ReportScreen(
-              caseId = key.caseId,
+              caseId = destination.caseId,
               casesRepository = casesRepository,
               onBackClick = { backStack.removeLastOrNull() }
           )
         }
-      },
-  )
+        is CaseDetail -> {
+            backStack.replaceTop(Report(caseId = destination.caseId))
+        }
+  }
+}
+
+private fun MutableList<NavKey>.replaceTop(destination: NavKey) {
+    if (isEmpty()) {
+        add(destination)
+    } else {
+        this[lastIndex] = destination
+    }
 }

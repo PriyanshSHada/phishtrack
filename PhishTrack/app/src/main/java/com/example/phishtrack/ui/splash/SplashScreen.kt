@@ -1,6 +1,11 @@
 package com.example.phishtrack.ui.splash
 
-import androidx.compose.animation.core.*
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -13,7 +18,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -27,23 +31,14 @@ fun SplashScreen(
     onNavigateNext: (isLoggedIn: Boolean) -> Unit
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "shield_pulse")
-    val scale by infiniteTransition.animateFloat(
-        initialValue = 0.9f,
-        targetValue = 1.1f,
+    val pulse by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
         animationSpec = infiniteRepeatable(
             animation = tween(1200, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
         ),
-        label = "scale"
-    )
-    val glowAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.4f,
-        targetValue = 0.9f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1200, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "glow"
+        label = "pulse"
     )
 
     LaunchedEffect(Unit) {
@@ -64,21 +59,18 @@ fun SplashScreen(
         ) {
             // Pulse Animated Shield Logo
             Box(
-                modifier = Modifier
-                    .size(150.dp)
-                    .graphicsLayer(
-                        scaleX = scale,
-                        scaleY = scale
-                    ),
+                modifier = Modifier.size(150.dp),
                 contentAlignment = Alignment.Center
             ) {
                 // Outer glowing circle
                 Canvas(modifier = Modifier.fillMaxSize()) {
+                    val pulseRadius = size.minDimension * (0.40f + pulse * 0.08f)
+                    val pulseAlpha = 0.12f + pulse * 0.18f
                     drawCircle(
                         color = Color(0x00, 0xF5, 0xFF), // Cyan
-                        radius = size.minDimension / 2.3f,
+                        radius = pulseRadius,
                         style = Stroke(width = 2f),
-                        alpha = glowAlpha * 0.3f
+                        alpha = pulseAlpha
                     )
                 }
 

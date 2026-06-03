@@ -20,3 +20,11 @@ npm run dev
 ```
 
 The server exposes `GET /api/health`.
+
+4. Verify database connectivity
+
+```bash
+npm run check:db
+```
+
+This validates `DATABASE_URL` format (including Supabase pooler hints) and runs a live Prisma connection test.

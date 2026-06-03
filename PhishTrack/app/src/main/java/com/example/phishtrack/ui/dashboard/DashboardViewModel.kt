@@ -19,16 +19,17 @@ class DashboardViewModel @Inject constructor(
     private val casesRepository: CasesRepository
 ) : ViewModel() {
 
-    private val _statsState = mutableStateOf<UiState<StatsResponse>>(UiState.Loading)
+    // Start as Idle (not Loading) — spinners only show after the user reaches the screen
+    private val _statsState = mutableStateOf<UiState<StatsResponse>>(UiState.Idle)
     val statsState: State<UiState<StatsResponse>> = _statsState
 
-    private val _recentCasesState = mutableStateOf<UiState<List<CaseResponse>>>(UiState.Loading)
+    private val _recentCasesState = mutableStateOf<UiState<List<CaseResponse>>>(UiState.Idle)
     val recentCasesState: State<UiState<List<CaseResponse>>> = _recentCasesState
 
-    private val _threatMapState = mutableStateOf<UiState<List<ThreatLocation>>>(UiState.Loading)
+    private val _threatMapState = mutableStateOf<UiState<List<ThreatLocation>>>(UiState.Idle)
     val threatMapState: State<UiState<List<ThreatLocation>>> = _threatMapState
 
-    private val _weeklyGraphState = mutableStateOf<UiState<List<WeeklyGraphData>>>(UiState.Loading)
+    private val _weeklyGraphState = mutableStateOf<UiState<List<WeeklyGraphData>>>(UiState.Idle)
     val weeklyGraphState: State<UiState<List<WeeklyGraphData>>> = _weeklyGraphState
 
     fun loadDashboardData() {
@@ -73,4 +74,7 @@ class DashboardViewModel @Inject constructor(
             }
         }
     }
+
+    /** Public alias for pull-to-refresh or manual reload from the UI */
+    fun refresh() = loadDashboardData()
 }

@@ -40,23 +40,24 @@ fun ReportScreen(
     onBackClick: () -> Unit
 ) {
     val context = LocalContext.current
+    // refreshKey drives the LaunchedEffects — incrementing it retries all data fetches
+    var refreshKey by remember { mutableStateOf(0) }
     var caseDetailState by remember { mutableStateOf<UiState<CaseDetailResponse>>(UiState.Loading) }
     var generateReportState by remember { mutableStateOf<UiState<Any>>(UiState.Idle) }
     var custodyChainState by remember { mutableStateOf<List<ChainOfCustodyResponse>>(emptyList()) }
 
-    LaunchedEffect(caseId) {
+    val coroutineScope = rememberCoroutineScope()
+
+    // Reload custody chain whenever refreshKey changes
+    LaunchedEffect(caseId, refreshKey) {
         casesRepository.getCustodyChain(caseId).collect { result ->
             result.onSuccess { custodyChainState = it }
         }
     }
 
-    fun loadData() {
+    // Reload case detail whenever refreshKey changes
+    LaunchedEffect(caseId, refreshKey) {
         caseDetailState = UiState.Loading
-    }
-
-    val coroutineScope = rememberCoroutineScope()
-
-    LaunchedEffect(caseId) {
         casesRepository.getCaseDetail(caseId).collect { result ->
             result.fold(
                 onSuccess = { caseDetailState = UiState.Success(it) },
@@ -468,8 +469,25 @@ fun ReportScreen(
                 }
             }
             else -> {
+                // Error state — show a Retry button so users can recover without restarting
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(text = "Failed to load report details.", color = Color.White)
+                    androidx.compose.foundation.layout.Column(
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = "Failed to load report details.",
+                            color = Color.White,
+                            fontSize = 14.sp
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Button(
+                            onClick = { refreshKey++ },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0x00, 0xF5, 0xFF)),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text("RETRY", color = Color(0x0A, 0x0E, 0x1A), fontWeight = FontWeight.Bold)
+                        }
+                    }
                 }
             }
         }
