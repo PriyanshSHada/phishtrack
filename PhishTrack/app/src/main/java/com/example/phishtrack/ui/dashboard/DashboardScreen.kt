@@ -21,6 +21,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.phishtrack.data.api.CaseResponse
@@ -187,10 +188,10 @@ fun MetricsGrid(stats: StatsResponse) {
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        MetricCard(title = "Total Cases", value = stats.total.toString(), color = Color(0x4A, 0x9E, 0xFF), modifier = Modifier.weight(1f))
-        MetricCard(title = "Open", value = stats.open.toString(), color = Color(0x00, 0xF5, 0xFF), modifier = Modifier.weight(1f))
-        MetricCard(title = "Closed", value = stats.closed.toString(), color = Color(0x00, 0xFF, 0x88), modifier = Modifier.weight(1f))
-        MetricCard(title = "Critical", value = stats.critical.toString(), color = Color(0xFF, 0x3B, 0x3B), modifier = Modifier.weight(1f))
+        MetricCard(title = "Users", value = stats.users.toString(), color = Color(0x4A, 0x9E, 0xFF), modifier = Modifier.weight(1f))
+        MetricCard(title = "Cases", value = stats.cases.toString(), color = Color(0x00, 0xF5, 0xFF), modifier = Modifier.weight(1f))
+        MetricCard(title = "Scans", value = stats.analyses.toString(), color = Color(0x00, 0xFF, 0x88), modifier = Modifier.weight(1f))
+        MetricCard(title = "Reports", value = stats.reports.toString(), color = Color(0xFF, 0x3B, 0x3B), modifier = Modifier.weight(1f))
     }
 }
 
@@ -480,7 +481,8 @@ fun CaseItemCard(case: CaseResponse, onClick: () -> Unit) {
                 text = case.url,
                 color = Color(0x88, 0x92, 0xB0),
                 fontSize = 13.sp,
-                maxLines = 1
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
 
             Spacer(modifier = Modifier.height(10.dp))

@@ -160,10 +160,10 @@ data class VerifyDetails(
 
 // --- Dashboard ---
 data class StatsResponse(
-    val total: Int,
-    val open: Int,
-    val closed: Int,
-    val critical: Int
+    val users: Int,
+    val cases: Int,
+    val analyses: Int,
+    val reports: Int
 )
 
 data class ThreatLocation(
@@ -176,7 +176,7 @@ data class ThreatLocation(
 )
 
 data class WeeklyGraphData(
-    val week: String, // "W1", "W2", etc.
+    val date: String, // "2026-05-27", "2026-05-28", etc.
     val count: Int
 )
 

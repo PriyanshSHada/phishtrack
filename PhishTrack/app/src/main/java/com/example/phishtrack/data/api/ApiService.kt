@@ -62,13 +62,13 @@ interface ApiService {
   @GET("api/dashboard/stats")
   suspend fun getDashboardStats(): StatsResponse
 
-  @GET("api/dashboard/recent-cases")
+  @GET("api/dashboard/recent")
   suspend fun getRecentCases(): List<CaseResponse>
 
   @GET("api/dashboard/threat-map")
   suspend fun getThreatMap(): List<ThreatLocation>
 
-  @GET("api/dashboard/weekly-graph")
+  @GET("api/dashboard/weekly")
   suspend fun getWeeklyGraph(): List<WeeklyGraphData>
 
   // --- Audit ---
