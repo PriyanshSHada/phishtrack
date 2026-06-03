@@ -9,7 +9,7 @@ module.exports = (actionOverride) => {
         
         if (isMutation || isAuth) {
           const userId = req.user?.userId || null;
-          let caseId = req.params.caseId || req.params.id || req.body.caseId || null;
+          let caseId = req.params.caseId || req.params.id || req.body?.caseId || null;
           
           // Validate UUID structure for caseId
           const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
