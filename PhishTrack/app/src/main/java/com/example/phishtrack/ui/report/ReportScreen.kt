@@ -405,29 +405,43 @@ fun ReportScreen(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
+                        val isGenerating = generateReportState is UiState.Loading
                         Button(
                             onClick = {
-                                generateReportState = UiState.Loading
-                                coroutineScope.launch {
-                                    casesRepository.generateReport(caseId).collect { result ->
-                                        result.fold(
-                                            onSuccess = {
-                                                generateReportState = UiState.Success(it)
-                                                Toast.makeText(context, "Report compiled successfully! Signature saved.", Toast.LENGTH_SHORT).show()
-                                            },
-                                            onFailure = {
-                                                generateReportState = UiState.Error(it.message ?: "Failed to generate report")
-                                                Toast.makeText(context, "PDF Error: ${it.message}", Toast.LENGTH_LONG).show()
-                                            }
-                                        )
+                                if (!isGenerating) {
+                                    generateReportState = UiState.Loading
+                                    coroutineScope.launch {
+                                        casesRepository.generateReport(caseId).collect { result ->
+                                            result.fold(
+                                                onSuccess = {
+                                                    generateReportState = UiState.Success(it)
+                                                    // Refresh case detail so reports list is updated
+                                                    refreshKey++
+                                                    Toast.makeText(context, "Report compiled! Signature saved.", Toast.LENGTH_SHORT).show()
+                                                },
+                                                onFailure = {
+                                                    generateReportState = UiState.Error(it.message ?: "Failed to generate report")
+                                                    Toast.makeText(context, "PDF Error: ${it.message}", Toast.LENGTH_LONG).show()
+                                                }
+                                            )
+                                        }
                                     }
                                 }
                             },
+                            enabled = !isGenerating,
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0x00, 0xF5, 0xFF)),
                             shape = RoundedCornerShape(6.dp),
                             modifier = Modifier.weight(1f).height(48.dp)
                         ) {
-                            Text(text = "COMPILE PDF", color = Color(0x0A, 0x0E, 0x1A), fontWeight = FontWeight.Bold)
+                            if (isGenerating) {
+                                CircularProgressIndicator(
+                                    color = Color(0x0A, 0x0E, 0x1A),
+                                    strokeWidth = 2.dp,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            } else {
+                                Text(text = "COMPILE PDF", color = Color(0x0A, 0x0E, 0x1A), fontWeight = FontWeight.Bold)
+                            }
                         }
 
                         Button(

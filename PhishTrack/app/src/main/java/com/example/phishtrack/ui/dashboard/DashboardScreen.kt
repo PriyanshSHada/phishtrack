@@ -250,106 +250,89 @@ fun ThreatRadarMapCard(locations: List<ThreatLocation>) {
         colors = CardDefaults.cardColors(containerColor = Color(0x14, 0x18, 0x29)),
         modifier = Modifier
             .fillMaxWidth()
-            .height(180.dp)
+            .height(200.dp)
             .border(1.dp, Color(0x2A, 0x35, 0x58), RoundedCornerShape(12.dp))
     ) {
-        val infiniteTransition = rememberInfiniteTransition(label = "radar")
-        val radarRadius by infiniteTransition.animateFloat(
-            initialValue = 0f,
-            targetValue = 1f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(2500, easing = LinearEasing),
-                repeatMode = RepeatMode.Restart
-            ),
-            label = "radius"
+        val infiniteTransition = rememberInfiniteTransition(label = "pulse")
+        val pulseScale by infiniteTransition.animateFloat(
+            initialValue = 0f, targetValue = 1f,
+            animationSpec = infiniteRepeatable(animation = tween(1800, easing = LinearEasing), repeatMode = RepeatMode.Restart),
+            label = "pulse_scale"
         )
-        val radarAlpha by infiniteTransition.animateFloat(
-            initialValue = 1f,
-            targetValue = 0f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(2500, easing = LinearEasing),
-                repeatMode = RepeatMode.Restart
-            ),
-            label = "alpha"
+        val pulseAlpha by infiniteTransition.animateFloat(
+            initialValue = 0.9f, targetValue = 0f,
+            animationSpec = infiniteRepeatable(animation = tween(1800, easing = LinearEasing), repeatMode = RepeatMode.Restart),
+            label = "pulse_alpha"
         )
 
         Box(modifier = Modifier.fillMaxSize()) {
-            // Cyber radar custom drawing
             Canvas(modifier = Modifier.fillMaxSize()) {
                 val w = size.width
                 val h = size.height
-                val center = Offset(w / 2, h / 2)
 
-                // Grid background lines
-                val gridStroke = Stroke(width = 1f)
-                val gridColor = Color(0x2A, 0x35, 0x58).copy(alpha = 0.5f)
-                
-                // Draw Concentric Radar Circles
-                drawCircle(color = gridColor, radius = h * 0.2f, center = center, style = gridStroke)
-                drawCircle(color = gridColor, radius = h * 0.4f, center = center, style = gridStroke)
-                drawCircle(color = gridColor, radius = h * 0.6f, center = center, style = gridStroke)
-                drawCircle(color = gridColor, radius = h * 0.8f, center = center, style = gridStroke)
-
-                // Crosshairs
-                drawLine(color = gridColor, start = Offset(0f, h / 2), end = Offset(w, h / 2), strokeWidth = 1f)
-                drawLine(color = gridColor, start = Offset(w / 2, 0f), end = Offset(w / 2, h), strokeWidth = 1f)
-
-                // Radar Sweeper Pulse
-                drawCircle(
-                    color = Color(0x00, 0xF5, 0xFF),
-                    radius = h * 0.8f * radarRadius,
-                    center = center,
-                    style = Stroke(width = 4f),
-                    alpha = radarAlpha * 0.6f
-                )
-
-                // Dynamic Threat Markers
-                // If location lists are available, render them. If empty, draw mock threat nodes.
-                val markers = if (locations.isNotEmpty()) {
-                    locations.mapNotNull { loc ->
-                        if (loc.latitude != null && loc.longitude != null) {
-                            // Map geo coordinates into canvas size bounded offset
-                            val mx = ((loc.longitude + 180) / 360) * w
-                            val my = ((90 - loc.latitude) / 180) * h
-                            Offset(mx.toFloat(), my.toFloat())
-                        } else null
-                    }
-                } else {
-                    listOf(
-                        Offset(w * 0.25f, h * 0.35f),
-                        Offset(w * 0.7f, h * 0.25f),
-                        Offset(w * 0.45f, h * 0.65f),
-                        Offset(w * 0.8f, h * 0.7f)
-                    )
+                // Draw lat/lon graticule grid
+                val gridColor = Color(0x2A, 0x35, 0x58).copy(alpha = 0.6f)
+                for (lat in listOf(-60f, -30f, 0f, 30f, 60f)) {
+                    val y = ((90f - lat) / 180f) * h
+                    drawLine(color = gridColor, start = Offset(0f, y), end = Offset(w, y), strokeWidth = 0.8f)
+                }
+                for (lon in listOf(-120f, -60f, 0f, 60f, 120f)) {
+                    val x = ((lon + 180f) / 360f) * w
+                    drawLine(color = gridColor, start = Offset(x, 0f), end = Offset(x, h), strokeWidth = 0.8f)
                 }
 
-                markers.forEach { point ->
-                    drawCircle(
-                        color = Color(0xFF, 0x3B, 0x3B), // Red alert dot
-                        radius = 6f,
-                        center = point
+                // Draw simplified continent blocks (geographic bounding boxes)
+                val landColor = Color(0x1E, 0x2A, 0x45)
+                fun geoRect(lon1: Float, lat1: Float, lon2: Float, lat2: Float) {
+                    val x = ((lon1 + 180f) / 360f) * w
+                    val y = ((90f - lat1) / 180f) * h
+                    drawRect(color = landColor, topLeft = Offset(x, y),
+                        size = Size(((lon2 + 180f) / 360f) * w - x, ((90f - lat2) / 180f) * h - y))
+                }
+                geoRect(-140f, 70f, -55f, 15f)   // North America
+                geoRect(-82f, 12f, -34f, -55f)    // South America
+                geoRect(-10f, 71f, 40f, 36f)      // Europe
+                geoRect(-17f, 37f, 52f, -35f)     // Africa
+                geoRect(40f, 75f, 145f, 10f)      // Asia
+                geoRect(113f, -12f, 154f, -39f)   // Australia
+                geoRect(-57f, 83f, -18f, 60f)     // Greenland
+
+                // Plot real threat dots with pulsing rings
+                locations.forEach { loc ->
+                    if (loc.latitude != null && loc.longitude != null) {
+                        val mx = ((loc.longitude + 180.0) / 360.0 * w).toFloat()
+                        val my = ((90.0 - loc.latitude) / 180.0 * h).toFloat()
+                        drawCircle(color = Color(0xFF, 0x3B, 0x3B), radius = 5f, center = Offset(mx, my))
+                        drawCircle(color = Color(0xFF, 0x3B, 0x3B), radius = 5f + 18f * pulseScale,
+                            center = Offset(mx, my), style = Stroke(width = 2f), alpha = pulseAlpha * 0.8f)
+                    }
+                }
+
+                // Show ghost placeholder dots only when truly no data
+                if (locations.isEmpty()) {
+                    val ghosts = listOf(
+                        Offset((((-100f + 180f) / 360f) * w), (((90f - 40f) / 180f) * h)),
+                        Offset((((10f + 180f) / 360f) * w), (((90f - 51f) / 180f) * h)),
+                        Offset((((120f + 180f) / 360f) * w), (((90f - 30f) / 180f) * h)),
+                        Offset((((-50f + 180f) / 360f) * w), (((90f - (-15f)) / 180f) * h))
                     )
-                    drawCircle(
-                        color = Color(0xFF, 0x3B, 0x3B),
-                        radius = 16f * radarRadius,
-                        center = point,
-                        style = Stroke(width = 2f),
-                        alpha = radarAlpha
-                    )
+                    ghosts.forEach { p -> drawCircle(color = Color(0xFF, 0x3B, 0x3B).copy(alpha = 0.3f), radius = 5f, center = p) }
                 }
             }
-            
-            // Map Metadata label overlay
-            Text(
-                text = "STATUS: ACTIVE MONITORING",
-                color = Color(0x00, 0xFF, 0x88), // Green Success
-                fontSize = 9.sp,
-                fontWeight = FontWeight.Bold,
-                fontFamily = FontFamily.Monospace,
-                modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .padding(8.dp)
-            )
+
+            // Status badge bottom-left
+            Row(
+                modifier = Modifier.align(Alignment.BottomStart).padding(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(modifier = Modifier.size(8.dp).background(Color(0x00, 0xFF, 0x88), CircleShape))
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = "LIVE: ${locations.size} THREAT${if (locations.size != 1) "S" else ""} TRACKED",
+                    color = Color(0x00, 0xFF, 0x88), fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace
+                )
+            }
         }
     }
 }
@@ -364,58 +347,34 @@ fun WeeklyGraphCard(weeklyData: List<WeeklyGraphData>) {
             .height(180.dp)
             .border(1.dp, Color(0x2A, 0x35, 0x58), RoundedCornerShape(12.dp))
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp)
-        ) {
-            Canvas(modifier = Modifier.fillMaxSize()) {
-                val w = size.width
-                val h = size.height
-
-                // Draw base line
-                drawLine(
-                    color = Color(0x2A, 0x35, 0x58),
-                    start = Offset(0f, h - 20f),
-                    end = Offset(w, h - 20f),
-                    strokeWidth = 2f
-                )
-
-                if (weeklyData.isEmpty()) {
-                    // Fallback mock graph drawing
-                    val mockCounts = listOf(4, 7, 2, 8, 5, 12, 6, 9)
-                    val barWidth = (w / mockCounts.size) - 16f
-                    val maxVal = mockCounts.maxOrNull() ?: 1
-
-                    mockCounts.forEachIndexed { i, count ->
-                        val barHeight = ((h - 40f) * count) / maxVal
-                        val rx = i * (w / mockCounts.size) + 8f
-                        val ry = h - 20f - barHeight
-
-                        drawRoundRect(
-                            brush = Brush.verticalGradient(
-                                colors = listOf(Color(0x00, 0xF5, 0xFF), Color(0x4A, 0x9E, 0xFF))
-                            ),
-                            topLeft = Offset(rx, ry),
-                            size = Size(barWidth, barHeight),
-                            cornerRadius = CornerRadius(6f, 6f)
-                        )
-                    }
-                } else {
-                    val maxVal = weeklyData.maxOfOrNull { it.count } ?: 1
+        Box(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+            if (weeklyData.isEmpty()) {
+                // Empty state — no fake data
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text(
+                        text = "No scan data this week yet.",
+                        color = Color(0x88, 0x92, 0xB0),
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Normal
+                    )
+                }
+            } else {
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    val w = size.width
+                    val h = size.height
+                    val maxVal = weeklyData.maxOfOrNull { it.count }?.coerceAtLeast(1) ?: 1
                     val barWidth = (w / weeklyData.size) - 16f
+
+                    // Base line
+                    drawLine(color = Color(0x2A, 0x35, 0x58), start = Offset(0f, h - 20f), end = Offset(w, h - 20f), strokeWidth = 2f)
 
                     weeklyData.forEachIndexed { i, data ->
                         val barHeight = ((h - 40f) * data.count) / maxVal
                         val rx = i * (w / weeklyData.size) + 8f
                         val ry = h - 20f - barHeight
-
                         drawRoundRect(
-                            brush = Brush.verticalGradient(
-                                colors = listOf(Color(0x00, 0xF5, 0xFF), Color(0x4A, 0x9E, 0xFF))
-                            ),
-                            topLeft = Offset(rx, ry),
-                            size = Size(barWidth, barHeight),
+                            brush = Brush.verticalGradient(colors = listOf(Color(0x00, 0xF5, 0xFF), Color(0x4A, 0x9E, 0xFF))),
+                            topLeft = Offset(rx, ry), size = Size(barWidth, barHeight),
                             cornerRadius = CornerRadius(6f, 6f)
                         )
                     }
@@ -424,6 +383,7 @@ fun WeeklyGraphCard(weeklyData: List<WeeklyGraphData>) {
         }
     }
 }
+
 
 @Composable
 fun CaseItemCard(case: CaseResponse, onClick: () -> Unit) {
