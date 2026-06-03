@@ -12,8 +12,8 @@ exports.getAllCases = async (req, res, next) => {
 
 exports.createCase = async (req, res, next) => {
   try {
-    const { title, description, url, source, priority, tags } = req.body;
-    if (!title) return res.status(400).json({ error: 'Missing title' });
+    const { description, url, source, priority, tags } = req.body;
+    if (!url) return res.status(400).json({ error: 'Missing url' });
     const startOfYear = new Date(new Date().getFullYear(), 0, 1);
     const seq = await prisma.case.count({ where: { created_at: { gte: startOfYear } } });
     const caseNumber = generateCaseNumber(seq + 1);
