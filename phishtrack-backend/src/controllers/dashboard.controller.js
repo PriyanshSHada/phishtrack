@@ -42,3 +42,27 @@ exports.getWeeklyGraph = async (req, res, next) => {
     next(err);
   }
 };
+
+exports.getThreatMap = async (req, res, next) => {
+  try {
+    const analyses = await prisma.analysis.findMany({
+      orderBy: { analyzed_at: 'desc' },
+      take: 100
+    });
+
+    const locations = analyses
+      .filter(a => a.ip_geolocation && !a.ip_geolocation.error && a.ip_geolocation.lat !== undefined && a.ip_geolocation.lon !== undefined)
+      .map(a => ({
+        ip: a.ip_geolocation.ip || null,
+        country: a.ip_geolocation.country || null,
+        city: a.ip_geolocation.city || null,
+        latitude: a.ip_geolocation.lat,
+        longitude: a.ip_geolocation.lon,
+        threat_score: a.threat_score || 0
+      }));
+
+    res.json(locations);
+  } catch (err) {
+    next(err);
+  }
+};

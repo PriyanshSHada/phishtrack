@@ -9,5 +9,6 @@ router.use(authMiddleware);
 router.get('/stats', dashboard.getStats);
 router.get('/recent', dashboard.getRecentCases);
 router.get('/weekly', dashboard.getWeeklyGraph);
+router.get('/threat-map', dashboard.getThreatMap);
 
 module.exports = router;
