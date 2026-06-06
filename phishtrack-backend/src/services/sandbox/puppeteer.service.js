@@ -23,20 +23,26 @@ exports.runSandbox = async (url) => {
     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36');
     await page.setViewport({ width: 1280, height: 720 });
 
-    const redirectChain = [];
-    page.on('response', response => {
-      const status = response.status();
-      if (status >= 300 && status <= 399) {
-        redirectChain.push(response.url());
+    const redirectChain = [url]; // Start with original URL
+    
+    // Track navigation requests to capture full redirect chain
+    page.on('request', request => {
+      if (request.isNavigationRequest()) {
+        const reqChain = request.redirectChain();
+        reqChain.forEach(reqUrl => {
+          if (!redirectChain.includes(reqUrl.url())) {
+            redirectChain.push(reqUrl.url());
+          }
+        });
       }
     });
 
     // Go to URL
-    await page.goto(url, { waitUntil: 'networkidle2', timeout: 10000 });
+    await page.goto(url, { waitUntil: 'networkidle2', timeout: 15000 });
     
-    // Final URL is also part of redirect chain if it changed
+    // Final URL is also part of chain
     const finalUrl = page.url();
-    if (redirectChain.length === 0 || redirectChain[redirectChain.length - 1] !== finalUrl) {
+    if (!redirectChain.includes(finalUrl)) {
       redirectChain.push(finalUrl);
     }
 

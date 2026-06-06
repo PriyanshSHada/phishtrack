@@ -85,6 +85,15 @@ exports.generateReport = async (req, res, next) => {
     };
     const digitalSignature = sign(payload);
 
+    // Fetch chain of custody for the report
+    const custodyChain = await prisma.chainOfCustody.findMany({
+      where: { caseId },
+      orderBy: { timestamp: 'asc' },
+      include: {
+        user: { select: { id: true, name: true, email: true } }
+      }
+    });
+
     // Generate PDF
     await pdfService.generatePdfReport(outputPath, {
       case: caseData,
@@ -92,7 +101,8 @@ exports.generateReport = async (req, res, next) => {
       analyst: user,
       digitalSignature: digitalSignature,
       version: version,
-      generated_at: generatedAt
+      generated_at: generatedAt,
+      custodyChain
     });
 
     // Compute file hash after creation

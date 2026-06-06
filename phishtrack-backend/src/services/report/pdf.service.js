@@ -324,8 +324,45 @@ exports.generatePdfReport = (outputPath, data) => {
          .text('CHAIN OF CUSTODY', 50, 35);
 
       let custodyY = 60;
-      doc.font('Helvetica').fontSize(9).fillColor(colors.subtext)
-         .text('The following cryptographic hashes establish the forensic integrity of this report.', 50, custodyY, { width: 495 });
+
+      const custodyChain = data.custodyChain || [];
+      if (custodyChain.length > 0) {
+        // Table header
+        doc.font('Helvetica-Bold').fontSize(8).fillColor(colors.subtext);
+        doc.text('Timestamp', 50, custodyY);
+        doc.text('Action', 180, custodyY);
+        doc.text('Analyst', 310, custodyY);
+        doc.text('Hash (SHA-256)', 400, custodyY);
+        doc.moveTo(50, custodyY + 12).lineTo(545, custodyY + 12).stroke(colors.border).lineWidth(0.5);
+        custodyY += 16;
+
+        custodyChain.forEach((entry, i) => {
+          if (i > 0) {
+            doc.moveTo(50, custodyY - 2).lineTo(545, custodyY - 2).stroke(colors.border).lineWidth(0.3).opacity(0.3);
+            doc.opacity(1);
+          }
+          const ts = new Date(entry.timestamp).toLocaleString('en-US', { month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+          const hashShort = (entry.hash_after || 'N/A').substring(0, 12) + '...';
+          const analystName = entry.user?.name || entry.userId || 'System';
+
+          doc.font('Helvetica').fontSize(7)
+             .fillColor(colors.muted).text(ts, 50, custodyY, { width: 120 })
+             .fillColor(colors.text).text(entry.action, 180, custodyY, { width: 120 })
+             .fillColor(colors.subtext).text(analystName, 310, custodyY, { width: 80 })
+             .font('Courier').fontSize(6).fillColor(colors.accent)
+             .text(hashShort, 400, custodyY, { width: 140 });
+
+          custodyY += 16;
+        });
+        custodyY += 10;
+      } else {
+        doc.font('Helvetica-Oblique').fontSize(9).fillColor(colors.subtext)
+           .text('No chain of custody records have been created yet. Records are generated when reports are compiled and cases are analyzed.', 50, custodyY, { width: 495, lineGap: 2 });
+        custodyY += 40;
+      }
+
+      doc.font('Helvetica').fontSize(8).fillColor(colors.subtext)
+         .text('The above cryptographic hashes establish the forensic integrity of this report. Each entry represents a verifiable event in the case lifecycle.', 50, custodyY, { width: 495 });
       custodyY += 20;
 
       // Footer on every page
