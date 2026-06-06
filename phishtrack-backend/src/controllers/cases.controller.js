@@ -77,6 +77,14 @@ exports.updateCase = async (req, res, next) => {
     const { id } = req.params;
     const { status, priority, description } = req.body;
 
+    // Ensure False_Positive exists in DB enum (Supabase PgBouncer blocks ALTER TYPE in transactions)
+    // This runs once per deploy — idempotent, safe to call repeatedly
+    try {
+      await prisma.$executeRawUnsafe(`ALTER TYPE "Status" ADD VALUE IF NOT EXISTS 'False_Positive'`);
+    } catch (_) {
+      // Value already exists or DB doesn't support IF NOT EXISTS — ok to ignore
+    }
+
     // Only allow valid fields to be updated
     const data = {};
     if (status !== undefined) {

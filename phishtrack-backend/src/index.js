@@ -59,6 +59,18 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, async () => {
   console.log(`PhishTrack backend listening on port ${PORT}`);
+
+  // Ensure DB enum has False_Positive (Supabase PgBouncer blocks ALTER TYPE in transactions)
+  try {
+    const { PrismaClient } = require('@prisma/client');
+    const prismaEnsure = new PrismaClient();
+    await prismaEnsure.$executeRawUnsafe(`ALTER TYPE "Status" ADD VALUE 'False_Positive'`);
+    await prismaEnsure.$disconnect();
+    console.log('DB enum: False_Positive ensured');
+  } catch (_) {
+    // Value already exists or blocked — safe to continue
+  }
+
   try {
     await redisClient.connect();
     console.log('Successfully connected to Redis');
