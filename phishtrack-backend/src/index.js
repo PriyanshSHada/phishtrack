@@ -60,11 +60,12 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, async () => {
   console.log(`PhishTrack backend listening on port ${PORT}`);
 
-  // Ensure DB enum has False_Positive (Supabase PgBouncer blocks ALTER TYPE in transactions)
+  // Ensure DB enum has False_Positive (uses direct connection bypassing PgBouncer)
   try {
+    const directUrl = process.env.DATABASE_URL.replace('pgbouncer=true', 'pgbouncer=false');
     const { PrismaClient } = require('@prisma/client');
-    const prismaEnsure = new PrismaClient();
-    await prismaEnsure.$executeRawUnsafe(`ALTER TYPE "Status" ADD VALUE 'False_Positive'`);
+    const prismaEnsure = new PrismaClient({ datasources: { db: { url: directUrl } } });
+    await prismaEnsure.$executeRawUnsafe(`ALTER TYPE "Status" ADD VALUE IF NOT EXISTS 'False_Positive'`);
     await prismaEnsure.$disconnect();
     console.log('DB enum: False_Positive ensured');
   } catch (_) {
