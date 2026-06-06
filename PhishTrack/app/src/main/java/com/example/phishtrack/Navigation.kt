@@ -1,8 +1,10 @@
 package com.example.phishtrack
 
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.rememberNavBackStack
@@ -111,20 +113,22 @@ fun MainNavigation(
           )
         }
 
-        Main -> {
-          MainScreen(
-              authRepository = authRepository,
-              casesRepository = casesRepository,
-              onNewCaseClick = { backStack.add(NewCase) },
-              onCaseClick = { caseId -> backStack.add(Report(caseId = caseId)) },
-              onLogoutClick = {
-                  backStack.replaceTop(Login)
-              }
-          )
-        }
+         Main -> {
+           MainScreen(
+               authRepository = authRepository,
+               casesRepository = casesRepository,
+               onNewCaseClick = { backStack.add(NewCase) },
+               onCaseClick = { caseId -> backStack.add(Report(caseId = caseId)) },
+               onLogoutClick = {
+                   authRepository.logout()
+                   backStack.replaceTop(Login)
+               }
+           )
+         }
 
         NewCase -> {
           val coroutineScope = rememberCoroutineScope()
+          val context = LocalContext.current
           NewCaseScreen(
               onBackClick = { backStack.removeLastOrNull() },
               onSubmitCase = { url, desc, src, priority, tags ->
@@ -134,7 +138,9 @@ fun MainNavigation(
                               onSuccess = { caseResponse ->
                                   backStack.replaceTop(AnalysisLoading(caseId = caseResponse.id))
                               },
-                              onFailure = {}
+                              onFailure = { err ->
+                                  Toast.makeText(context, "Failed to create case: ${err.message}", Toast.LENGTH_LONG).show()
+                              }
                           )
                       }
                   }

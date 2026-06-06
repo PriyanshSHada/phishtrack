@@ -1,7 +1,5 @@
 package com.example.phishtrack.ui.auth
 
-import android.widget.Toast
-import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -119,14 +117,16 @@ fun SecurityCheckScreen(
         if (isPinEnabled) {
             OutlinedTextField(
                 value = pinInput,
-                onValueChange = { 
-                    if (it.length <= 4) pinInput = it 
-                    if (pinInput.length == 4) {
-                        if (pinInput == savedPin) {
-                            onSuccess()
-                        } else {
-                            errorMessage = "Incorrect PIN"
-                            pinInput = ""
+                onValueChange = { value ->
+                    if (value.length <= 4) {
+                        pinInput = value
+                        if (value.length == 4) {
+                            if (value == savedPin) {
+                                onSuccess()
+                            } else {
+                                errorMessage = "Incorrect PIN"
+                                pinInput = ""
+                            }
                         }
                     }
                 },

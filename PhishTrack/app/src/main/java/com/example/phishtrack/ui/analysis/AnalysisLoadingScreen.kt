@@ -73,11 +73,13 @@ fun AnalysisLoadingScreen(
         step4Done = true
     }
 
-    // Handle completed state
+    // Handle completed state — navigate as soon as analysis finishes OR step4 completes
     LaunchedEffect(analysisResult, step4Done) {
-        if (analysisResult is UiState.Success && step4Done) {
-            step5Done = true
-            delay(1000)
+        if (analysisResult is UiState.Success) {
+            if (!step5Done) {
+                step5Done = true
+                delay(1000)
+            }
             onAnalysisComplete(caseId)
         } else if (analysisResult is UiState.Error) {
             Toast.makeText(context, (analysisResult as UiState.Error).message, Toast.LENGTH_LONG).show()
