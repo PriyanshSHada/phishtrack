@@ -87,7 +87,7 @@ exports.updateCase = async (req, res, next) => {
         return res.status(400).json({ error: `Invalid status value. Must be one of: ${validStatuses.join(', ')}` });
       }
     }
-    if (priority !== undefined) {
+    if (priority !== undefined && priority !== null) {
       const validPriorities = ['Low', 'Medium', 'High', 'Critical'];
       if (validPriorities.includes(priority)) {
         data.priority = priority;
