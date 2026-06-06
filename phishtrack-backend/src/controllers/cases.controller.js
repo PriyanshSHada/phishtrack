@@ -77,26 +77,25 @@ exports.updateCase = async (req, res, next) => {
     const { id } = req.params;
     const { status, priority, description } = req.body;
 
-    // Ensure False_Positive exists in DB enum (Supabase PgBouncer blocks ALTER TYPE in transactions)
-    // This runs once per deploy — idempotent, safe to call repeatedly
-    try {
-      await prisma.$executeRawUnsafe(`ALTER TYPE "Status" ADD VALUE IF NOT EXISTS 'False_Positive'`);
-    } catch (_) {
-      // Value already exists or DB doesn't support IF NOT EXISTS — ok to ignore
-    }
-
-    // Only allow valid fields to be updated
+    const validStatuses = ['Open', 'Investigating', 'Closed', 'False_Positive'];
+    const validPriorities = ['Low', 'Medium', 'High', 'Critical'];
     const data = {};
-    if (status !== undefined) {
-      const validStatuses = ['Open', 'Investigating', 'Closed', 'False_Positive'];
+
+    // Handle False_Positive via raw SQL to bypass Supabase PgBouncer ALTER TYPE limitation
+    if (status === 'False_Positive') {
+      await prisma.$executeRawUnsafe(
+        `UPDATE "Case" SET status = $1::text WHERE id = $2`, 'False_Positive', id
+      );
+      data.status = 'Closed'; // fallback for Prisma's cache consistency
+    } else if (status !== undefined) {
       if (validStatuses.includes(status)) {
         data.status = status;
       } else {
         return res.status(400).json({ error: `Invalid status value. Must be one of: ${validStatuses.join(', ')}` });
       }
     }
+
     if (priority !== undefined && priority !== null) {
-      const validPriorities = ['Low', 'Medium', 'High', 'Critical'];
       if (validPriorities.includes(priority)) {
         data.priority = priority;
       } else {
@@ -108,6 +107,11 @@ exports.updateCase = async (req, res, next) => {
     }
 
     if (Object.keys(data).length === 0) {
+      // If we already updated via raw SQL, return success
+      if (status === 'False_Positive') {
+        const updated = await prisma.case.findUnique({ where: { id } });
+        return res.json(updated);
+      }
       return res.status(400).json({ error: 'No valid fields to update. Use status, priority, and/or description.' });
     }
 
