@@ -115,6 +115,16 @@ class CasesRepository @Inject constructor(
         }
     }
 
+    fun deleteCase(caseId: String): Flow<Result<MessageResponse>> = flow {
+        try {
+            val response = apiService.deleteCase(caseId)
+            caseDao.deleteCaseById(caseId)
+            emit(Result.success(response))
+        } catch (e: Exception) {
+            emit(Result.failure(e))
+        }
+    }
+
     fun getTimeline(caseId: String): Flow<Result<List<TimelineEvent>>> = flow {
         try {
             val response = apiService.getCaseTimeline(caseId)

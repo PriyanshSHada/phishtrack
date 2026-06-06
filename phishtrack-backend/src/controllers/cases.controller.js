@@ -114,7 +114,14 @@ exports.updateCase = async (req, res, next) => {
 exports.deleteCase = async (req, res, next) => {
   try {
     const { id } = req.params;
+
+    // Delete child records first (foreign key constraints)
+    await prisma.analysis.deleteMany({ where: { caseId: id } });
+    await prisma.chainOfCustody.deleteMany({ where: { caseId: id } });
+    await prisma.report.deleteMany({ where: { caseId: id } });
+    await prisma.auditLog.deleteMany({ where: { caseId: id } });
     await prisma.case.delete({ where: { id } });
+
     res.status(204).end();
   } catch (err) {
     next(err);

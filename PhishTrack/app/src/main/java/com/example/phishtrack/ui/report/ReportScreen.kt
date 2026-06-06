@@ -12,6 +12,7 @@ import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.*
@@ -64,7 +65,7 @@ fun ReportScreen(
     var generateReportState by remember { mutableStateOf<UiState<Any>>(UiState.Idle) }
     var custodyChainState by remember { mutableStateOf<List<ChainOfCustodyResponse>>(emptyList()) }
     var updatingStatus by remember { mutableStateOf<String?>(null) }
-
+    var showDeleteDialog by remember { mutableStateOf(false) }
 
     val coroutineScope = rememberCoroutineScope()
 
@@ -110,7 +111,16 @@ fun ReportScreen(
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = Color(0x0A, 0x0E, 0x1A),
                     titleContentColor = Color.White
-                )
+                ),
+                actions = {
+                    IconButton(onClick = { showDeleteDialog = true }) {
+                        Icon(
+                            Icons.Default.Delete,
+                            contentDescription = "Delete Case",
+                            tint = Color(0xFF, 0x55, 0x55)
+                        )
+                    }
+                }
             )
         },
         containerColor = Color(0x0A, 0x0E, 0x1A)
