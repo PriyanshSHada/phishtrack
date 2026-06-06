@@ -189,9 +189,36 @@ exports.downloadPdf = async (req, res, next) => {
       return res.status(404).json({ error: 'Report not found' });
     }
     const filePath = path.join(__dirname, '../../uploads/reports', `${id}.pdf`);
+
+    // If file doesn't exist (Render ephemeral disk), regenerate it
     if (!fs.existsSync(filePath)) {
-      return res.status(404).json({ error: 'PDF file not found on disk' });
+      const caseData = await prisma.case.findUnique({ where: { id: report.caseId } });
+      const analysis = await prisma.analysis.findFirst({
+        where: { caseId: report.caseId },
+        orderBy: { analyzed_at: 'desc' }
+      });
+      const user = await prisma.user.findUnique({ where: { id: report.generatedById } });
+
+      if (!caseData) {
+        return res.status(404).json({ error: 'Associated case not found' });
+      }
+
+      // Ensure directory exists
+      const reportsDir = path.join(__dirname, '../../uploads/reports');
+      if (!fs.existsSync(reportsDir)) {
+        fs.mkdirSync(reportsDir, { recursive: true });
+      }
+
+      await pdfService.generatePdfReport(filePath, {
+        case: caseData,
+        analysis: analysis || {},
+        analyst: user || { name: 'Unknown', email: '' },
+        digitalSignature: report.digital_signature || 'N/A',
+        version: report.version,
+        generated_at: report.generated_at
+      });
     }
+
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="PhishTrack_Report_Case_${report.caseId}_v${report.version}.pdf"`);
     fs.createReadStream(filePath).pipe(res);
