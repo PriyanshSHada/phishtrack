@@ -122,7 +122,7 @@ exports.deleteCase = async (req, res, next) => {
     await prisma.auditLog.deleteMany({ where: { caseId: id } });
     await prisma.case.delete({ where: { id } });
 
-    res.status(204).end();
+    res.json({ message: 'Case deleted successfully' });
   } catch (err) {
     next(err);
   }
