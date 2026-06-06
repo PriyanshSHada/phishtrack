@@ -25,6 +25,7 @@ android {
         }
     }
     compileOptions {
+        isCoreLibraryDesugaringEnabled = true
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
@@ -54,6 +55,8 @@ dependencies {
   val composeBom = platform(libs.androidx.compose.bom)
   implementation(composeBom)
   androidTestImplementation(composeBom)
+
+  coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
 
   // Core Android dependencies
   implementation(libs.androidx.core.ktx)
@@ -106,9 +109,8 @@ dependencies {
   add("kapt", libs.androidx.room.compiler)
   implementation(libs.androidx.room.ktx)
 
-  // Google Maps SDK
-  implementation(libs.google.maps.compose)
-  implementation(libs.play.services.maps)
+  // MapLibre — free vector maps, no API key, OpenFreeMap tiles
+  implementation("org.maplibre.gl:android-sdk:11.0.1")
 
   // Biometrics Lock
   implementation(libs.androidx.biometric)

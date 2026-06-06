@@ -68,7 +68,17 @@ exports.getThreatMap = async (req, res, next) => {
   try {
     const analyses = await prisma.analysis.findMany({
       orderBy: { analyzed_at: 'desc' },
-      take: 100
+      take: 100,
+      include: {
+        case: {
+          select: {
+            id: true,
+            case_number: true,
+            url: true,
+            priority: true
+          }
+        }
+      }
     });
 
     const locations = analyses
@@ -79,7 +89,15 @@ exports.getThreatMap = async (req, res, next) => {
         city: a.ip_geolocation.city || null,
         latitude: a.ip_geolocation.lat,
         longitude: a.ip_geolocation.lon,
-        threat_score: a.threat_score || 0
+        threat_score: a.threat_score || 0,
+        severity: a.severity || 'Low',
+        caseId: a.case.id,
+        case_number: a.case.case_number,
+        url: a.case.url,
+        priority: a.case.priority,
+        ai_summary: a.ai_summary || null,
+        ai_indicators: a.ai_indicators || [],
+        isp: a.ip_geolocation.isp || null
       }));
 
     res.json(locations);

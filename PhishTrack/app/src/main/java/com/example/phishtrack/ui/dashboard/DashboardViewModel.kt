@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.phishtrack.data.api.CaseResponse
 import com.example.phishtrack.data.api.StatsResponse
 import com.example.phishtrack.data.api.ThreatLocation
+import com.example.phishtrack.data.api.WeeklyDashboardResponse
 import com.example.phishtrack.data.api.WeeklyGraphData
 import com.example.phishtrack.data.repository.CasesRepository
 import com.example.phishtrack.ui.auth.UiState
@@ -29,8 +30,8 @@ class DashboardViewModel @Inject constructor(
     private val _threatMapState = mutableStateOf<UiState<List<ThreatLocation>>>(UiState.Idle)
     val threatMapState: State<UiState<List<ThreatLocation>>> = _threatMapState
 
-    private val _weeklyGraphState = mutableStateOf<UiState<List<WeeklyGraphData>>>(UiState.Idle)
-    val weeklyGraphState: State<UiState<List<WeeklyGraphData>>> = _weeklyGraphState
+    private val _weeklyGraphState = mutableStateOf<UiState<WeeklyDashboardResponse>>(UiState.Idle)
+    val weeklyGraphState: State<UiState<WeeklyDashboardResponse>> = _weeklyGraphState
 
     fun loadDashboardData() {
         _statsState.value = UiState.Loading

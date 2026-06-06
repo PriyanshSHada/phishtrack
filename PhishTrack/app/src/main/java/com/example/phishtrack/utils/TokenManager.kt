@@ -2,12 +2,13 @@ package com.example.phishtrack.utils
 
 import android.content.Context
 import android.content.SharedPreferences
+import androidx.core.content.edit
 
 class TokenManager(context: Context) {
   private val prefs: SharedPreferences = context.getSharedPreferences("phishtrack_prefs", Context.MODE_PRIVATE)
 
   fun saveToken(token: String) {
-    prefs.edit().putString("auth_token", token).apply()
+    prefs.edit { putString("auth_token", token) }
   }
 
   fun getToken(): String? {
@@ -15,11 +16,11 @@ class TokenManager(context: Context) {
   }
 
   fun clearToken() {
-    prefs.edit().remove("auth_token").apply()
+    prefs.edit { remove("auth_token") }
   }
 
   fun saveEmail(email: String) {
-    prefs.edit().putString("user_email", email).apply()
+    prefs.edit { putString("user_email", email) }
   }
 
   fun getEmail(): String? {
@@ -27,7 +28,7 @@ class TokenManager(context: Context) {
   }
 
   fun saveUserId(userId: String) {
-    prefs.edit().putString("user_id", userId).apply()
+    prefs.edit { putString("user_id", userId) }
   }
 
   fun getUserId(): String? {
@@ -35,7 +36,7 @@ class TokenManager(context: Context) {
   }
 
   fun setBiometricEnabled(enabled: Boolean) {
-    prefs.edit().putBoolean("biometric_enabled", enabled).apply()
+    prefs.edit { putBoolean("biometric_enabled", enabled) }
   }
 
   fun isBiometricEnabled(): Boolean {
@@ -43,7 +44,7 @@ class TokenManager(context: Context) {
   }
 
   fun setPinLockEnabled(enabled: Boolean) {
-    prefs.edit().putBoolean("pin_lock_enabled", enabled).apply()
+    prefs.edit { putBoolean("pin_lock_enabled", enabled) }
   }
 
   fun isPinLockEnabled(): Boolean {
@@ -51,7 +52,7 @@ class TokenManager(context: Context) {
   }
 
   fun setPin(pin: String) {
-    prefs.edit().putString("app_pin", pin).apply()
+    prefs.edit { putString("app_pin", pin) }
   }
 
   fun getPin(): String? {

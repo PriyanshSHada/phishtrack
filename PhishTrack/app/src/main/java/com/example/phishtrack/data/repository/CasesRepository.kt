@@ -19,7 +19,7 @@ class CasesRepository @Inject constructor(
         entities.map { entity ->
             CaseResponse(
                 id = entity.id,
-                case_number = entity.caseNumber,
+                caseNumber = entity.caseNumber,
                 userId = entity.userId,
                 url = entity.url,
                 description = entity.description,
@@ -27,20 +27,20 @@ class CasesRepository @Inject constructor(
                 priority = entity.priority,
                 status = entity.status,
                 tags = if (entity.tags.isEmpty()) emptyList() else entity.tags.split(","),
-                created_at = entity.createdAt,
-                updated_at = entity.updatedAt
+                createdAt = entity.createdAt,
+                updatedAt = entity.updatedAt
             )
         }
     }
 
     // Refresh cases from server and update local cache
-    suspend fun refreshCases(): Result<Unit> {
+    suspend fun refreshCases(status: String? = null, priority: String? = null, date: String? = null): Result<Unit> {
         return try {
-            val networkCases = apiService.getCases()
+            val networkCases = apiService.getCases(status, priority, date)
             val entities = networkCases.map { case ->
                 CaseEntity(
                     id = case.id,
-                    caseNumber = case.case_number,
+                    caseNumber = case.caseNumber,
                     userId = case.userId,
                     url = case.url,
                     description = case.description,
@@ -48,8 +48,8 @@ class CasesRepository @Inject constructor(
                     priority = case.priority,
                     status = case.status,
                     tags = case.tags.joinToString(","),
-                    createdAt = case.created_at,
-                    updatedAt = case.updated_at
+                    createdAt = case.createdAt,
+                    updatedAt = case.updatedAt
                 )
             }
             caseDao.clearAllCases()
@@ -76,7 +76,7 @@ class CasesRepository @Inject constructor(
             caseDao.insertCase(
                 CaseEntity(
                     id = response.id,
-                    caseNumber = response.case_number,
+                    caseNumber = response.caseNumber,
                     userId = response.userId,
                     url = response.url,
                     description = response.description,
@@ -84,8 +84,8 @@ class CasesRepository @Inject constructor(
                     priority = response.priority,
                     status = response.status,
                     tags = response.tags.joinToString(","),
-                    createdAt = response.created_at,
-                    updatedAt = response.updated_at
+                    createdAt = response.createdAt,
+                    updatedAt = response.updatedAt
                 )
             )
             emit(Result.success(response))
@@ -105,7 +105,7 @@ class CasesRepository @Inject constructor(
                         status = response.status,
                         priority = response.priority,
                         description = response.description,
-                        updatedAt = response.updated_at
+                        updatedAt = response.updatedAt
                     )
                 )
             }
@@ -185,6 +185,11 @@ class CasesRepository @Inject constructor(
         }
     }
 
+    suspend fun downloadReportBytes(reportId: String): ByteArray {
+        val response = apiService.downloadReportPdf(reportId)
+        return response.bytes()
+    }
+
     // --- Dashboard ---
     fun getStats(): Flow<Result<StatsResponse>> = flow {
         try {
@@ -213,7 +218,7 @@ class CasesRepository @Inject constructor(
         }
     }
 
-    fun getWeeklyGraph(): Flow<Result<List<WeeklyGraphData>>> = flow {
+    fun getWeeklyGraph(): Flow<Result<WeeklyDashboardResponse>> = flow {
         try {
             val response = apiService.getWeeklyGraph()
             emit(Result.success(response))

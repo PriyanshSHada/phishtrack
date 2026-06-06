@@ -1,7 +1,14 @@
 package com.example.phishtrack.ui.dashboard
 
+import android.graphics.BitmapFactory
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.shape.CircleShape
@@ -18,12 +25,35 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.drawText
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import com.google.gson.JsonObject
+import org.maplibre.android.MapLibre
+import org.maplibre.android.camera.CameraPosition
+import org.maplibre.android.camera.CameraUpdateFactory
+import org.maplibre.android.geometry.LatLng
+import org.maplibre.android.maps.MapLibreMap
+import org.maplibre.android.maps.MapView
+import org.maplibre.android.maps.Style
+import org.maplibre.android.style.layers.CircleLayer
+import org.maplibre.android.style.layers.PropertyFactory.*
+import org.maplibre.android.style.sources.GeoJsonSource
+import org.maplibre.geojson.Feature
+import org.maplibre.geojson.FeatureCollection
+import org.maplibre.geojson.Point
 import com.example.phishtrack.data.api.CaseResponse
 import com.example.phishtrack.data.api.StatsResponse
 import com.example.phishtrack.data.api.ThreatLocation
@@ -36,7 +66,8 @@ fun DashboardScreen(
     viewModel: DashboardViewModel,
     onNewCaseClick: () -> Unit,
     onCaseClick: (String) -> Unit,
-    onBottomNavClick: (String) -> Unit
+    onBottomNavClick: (String) -> Unit,
+    onDateFilterClick: (String) -> Unit
 ) {
     LaunchedEffect(Unit) {
         viewModel.loadDashboardData()
@@ -139,9 +170,12 @@ fun DashboardScreen(
             
             val weeklyData = when (weeklyGraphState) {
                 is UiState.Success -> (weeklyGraphState as UiState.Success).data
-                else -> emptyList()
+                else -> null
             }
-            WeeklyGraphCard(weeklyData)
+            WeeklyHeatmapSection(
+                weeklyData = weeklyData?.currentWeek ?: emptyList(),
+                onDateSelected = onDateFilterClick
+            )
 
             Spacer(modifier = Modifier.height(24.dp))
 
@@ -245,92 +279,362 @@ fun MetricCard(title: String, value: String, color: Color, modifier: Modifier = 
 
 @Composable
 fun ThreatRadarMapCard(locations: List<ThreatLocation>) {
-    Card(
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0x14, 0x18, 0x29)),
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(200.dp)
-            .border(1.dp, Color(0x2A, 0x35, 0x58), RoundedCornerShape(12.dp))
-    ) {
-        val infiniteTransition = rememberInfiniteTransition(label = "pulse")
-        val pulseScale by infiniteTransition.animateFloat(
-            initialValue = 0f, targetValue = 1f,
-            animationSpec = infiniteRepeatable(animation = tween(1800, easing = LinearEasing), repeatMode = RepeatMode.Restart),
-            label = "pulse_scale"
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    var mapRef by remember { mutableStateOf<org.maplibre.android.maps.MapLibreMap?>(null) }
+    var selectedThreat by remember { mutableStateOf<ThreatLocation?>(null) }
+
+    val demoLocations = remember {
+        listOf(
+            ThreatLocation(null, "US", "United States",  39.5,  -98.4, 85, null, null, null, null, null, null, emptyList(), null),
+            ThreatLocation(null, "DE", "Germany",        51.2,   10.5, 72, null, null, null, null, null, null, emptyList(), null),
+            ThreatLocation(null, "CN", "China",          36.0,  104.0, 91, null, null, null, null, null, null, emptyList(), null),
+            ThreatLocation(null, "BR", "Brazil",        -10.0,  -53.0, 60, null, null, null, null, null, null, emptyList(), null),
+            ThreatLocation(null, "IN", "India",          22.5,   80.7, 78, null, null, null, null, null, null, emptyList(), null),
         )
-        val pulseAlpha by infiniteTransition.animateFloat(
-            initialValue = 0.9f, targetValue = 0f,
-            animationSpec = infiniteRepeatable(animation = tween(1800, easing = LinearEasing), repeatMode = RepeatMode.Restart),
-            label = "pulse_alpha"
-        )
+    }
+    val displayLocations = locations.ifEmpty { demoLocations }
 
-        Box(modifier = Modifier.fillMaxSize()) {
-            Canvas(modifier = Modifier.fillMaxSize()) {
-                val w = size.width
-                val h = size.height
+    Column {
+        Card(
+            shape = RoundedCornerShape(12.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF, 0xFF, 0xFF)),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(if (selectedThreat != null) 420.dp else 240.dp)
+                .border(1.dp, Color(0x2A, 0x35, 0x58), RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(12.dp))
+        ) {
+            Box(modifier = Modifier.fillMaxSize()) {
+                AndroidView(
+                    modifier = Modifier.fillMaxSize(),
+                    factory = { ctx ->
+                        MapLibre.getInstance(ctx)
+                        MapView(ctx).also { mv ->
+                            val observer = LifecycleEventObserver { _, event ->
+                                when (event) {
+                                    Lifecycle.Event.ON_START   -> mv.onStart()
+                                    Lifecycle.Event.ON_RESUME  -> mv.onResume()
+                                    Lifecycle.Event.ON_PAUSE   -> mv.onPause()
+                                    Lifecycle.Event.ON_STOP    -> mv.onStop()
+                                    Lifecycle.Event.ON_DESTROY -> mv.onDestroy()
+                                    else -> {}
+                                }
+                            }
+                            lifecycle.addObserver(observer)
+                            mv.onCreate(null)
+                            mv.onStart()
 
-                // Draw lat/lon graticule grid
-                val gridColor = Color(0x2A, 0x35, 0x58).copy(alpha = 0.6f)
-                for (lat in listOf(-60f, -30f, 0f, 30f, 60f)) {
-                    val y = ((90f - lat) / 180f) * h
-                    drawLine(color = gridColor, start = Offset(0f, y), end = Offset(w, y), strokeWidth = 0.8f)
-                }
-                for (lon in listOf(-120f, -60f, 0f, 60f, 120f)) {
-                    val x = ((lon + 180f) / 360f) * w
-                    drawLine(color = gridColor, start = Offset(x, 0f), end = Offset(x, h), strokeWidth = 0.8f)
-                }
+                            mv.getMapAsync { map ->
+                                mapRef = map
+                                map.cameraPosition = CameraPosition.Builder()
+                                    .target(LatLng(20.0, 10.0))
+                                    .zoom(1.0)
+                                    .build()
 
-                // Draw simplified continent blocks (geographic bounding boxes)
-                val landColor = Color(0x1E, 0x2A, 0x45)
-                fun geoRect(lon1: Float, lat1: Float, lon2: Float, lat2: Float) {
-                    val x = ((lon1 + 180f) / 360f) * w
-                    val y = ((90f - lat1) / 180f) * h
-                    drawRect(color = landColor, topLeft = Offset(x, y),
-                        size = Size(((lon2 + 180f) / 360f) * w - x, ((90f - lat2) / 180f) * h - y))
-                }
-                geoRect(-140f, 70f, -55f, 15f)   // North America
-                geoRect(-82f, 12f, -34f, -55f)    // South America
-                geoRect(-10f, 71f, 40f, 36f)      // Europe
-                geoRect(-17f, 37f, 52f, -35f)     // Africa
-                geoRect(40f, 75f, 145f, 10f)      // Asia
-                geoRect(113f, -12f, 154f, -39f)   // Australia
-                geoRect(-57f, 83f, -18f, 60f)     // Greenland
+                                val satelliteStyle = """
+                                {
+                                  "version": 8,
+                                  "sources": {
+                                    "esri-satellite": {
+                                      "type": "raster",
+                                      "tiles": ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"],
+                                      "tileSize": 256
+                                    }
+                                  },
+                                  "layers": [{ "id": "satellite", "type": "raster", "source": "esri-satellite" }]
+                                }
+                                """.trimIndent()
 
-                // Plot real threat dots with pulsing rings
-                locations.forEach { loc ->
-                    if (loc.latitude != null && loc.longitude != null) {
-                        val mx = ((loc.longitude + 180.0) / 360.0 * w).toFloat()
-                        val my = ((90.0 - loc.latitude) / 180.0 * h).toFloat()
-                        drawCircle(color = Color(0xFF, 0x3B, 0x3B), radius = 5f, center = Offset(mx, my))
-                        drawCircle(color = Color(0xFF, 0x3B, 0x3B), radius = 5f + 18f * pulseScale,
-                            center = Offset(mx, my), style = Stroke(width = 2f), alpha = pulseAlpha * 0.8f)
+                                map.setStyle(Style.Builder().fromJson(satelliteStyle)) { style ->
+                                    val features = displayLocations
+                                        .filter { it.latitude != null && it.longitude != null }
+                                        .mapIndexed { idx, loc ->
+                                            val props = JsonObject().apply {
+                                                val score = loc.threatScore ?: 0
+                                                addProperty("color", when {
+                                                    score >= 70 -> "#FF3B3B"
+                                                    score >= 40 -> "#FFA500"
+                                                    else        -> "#00CC66"
+                                                })
+                                                addProperty("score", score)
+                                                addProperty("index", idx)
+                                            }
+                                            Feature.fromGeometry(
+                                                Point.fromLngLat(loc.longitude!!, loc.latitude!!),
+                                                props
+                                            )
+                                        }
+
+                                    style.addSource(
+                                        GeoJsonSource("threats",
+                                            FeatureCollection.fromFeatures(features))
+                                    )
+                                    style.addLayer(
+                                        CircleLayer("threats-glow", "threats")
+                                            .withProperties(
+                                                circleRadius(14f),
+                                                circleColor("{color}"),
+                                                circleOpacity(0.25f),
+                                                circleBlur(1f)
+                                            )
+                                    )
+                                    style.addLayer(
+                                        CircleLayer("threats-dot", "threats")
+                                            .withProperties(
+                                                circleRadius(6f),
+                                                circleColor("{color}"),
+                                                circleStrokeColor("#FFFFFF"),
+                                                circleStrokeWidth(1.5f)
+                                            )
+                                    )
+
+                                    map.addOnMapClickListener { point ->
+                                        val screenPoint = map.projection.toScreenLocation(point)
+                                        val features = map.queryRenderedFeatures(screenPoint, "threats-dot")
+                                        if (features.isNotEmpty()) {
+                                            val idx = features[0].getNumberProperty("index")?.toInt() ?: 0
+                                            if (idx < displayLocations.size) {
+                                                selectedThreat = displayLocations[idx]
+                                                map.animateCamera(
+                                                    CameraUpdateFactory.newLatLngZoom(
+                                                        LatLng(displayLocations[idx].latitude!!, displayLocations[idx].longitude!!),
+                                                        4.0
+                                                    )
+                                                )
+                                            }
+                                        } else {
+                                            selectedThreat = null
+                                        }
+                                        true
+                                    }
+                                }
+                            }
+                        }
+                    }
+                )
+
+                // ── Threat Detail Overlay Panel ──
+                if (selectedThreat != null) {
+                    Box(modifier = Modifier.align(Alignment.BottomCenter)) {
+                        selectedThreat?.let { threat -> ThreatOverlay(threat) {
+                            selectedThreat = null
+                        }}
                     }
                 }
 
-                // Show ghost placeholder dots only when truly no data
-                if (locations.isEmpty()) {
-                    val ghosts = listOf(
-                        Offset((((-100f + 180f) / 360f) * w), (((90f - 40f) / 180f) * h)),
-                        Offset((((10f + 180f) / 360f) * w), (((90f - 51f) / 180f) * h)),
-                        Offset((((120f + 180f) / 360f) * w), (((90f - 30f) / 180f) * h)),
-                        Offset((((-50f + 180f) / 360f) * w), (((90f - (-15f)) / 180f) * h))
+                // Zoom buttons — top right
+                Column(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(horizontal = 8.dp, vertical = if (selectedThreat != null) 8.dp else 40.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    MapZoomButton("+") { mapRef?.animateCamera(CameraUpdateFactory.zoomIn()) }
+                    MapZoomButton("−") { mapRef?.animateCamera(CameraUpdateFactory.zoomOut()) }
+                    MapZoomButton("⊟") {
+                        mapRef?.animateCamera(CameraUpdateFactory.newCameraPosition(
+                            CameraPosition.Builder().target(LatLng(20.0, 10.0)).zoom(1.0).build()))
+                    }
+                }
+
+                // Status badge — top left
+                Row(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(8.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(Color(0x0D, 0x14, 0x26).copy(alpha = 0.8f))
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(modifier = Modifier.size(7.dp).background(Color(0x00, 0xFF, 0x88), CircleShape))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = if (locations.isNotEmpty()) "LIVE: ${locations.size} SITES" else "DEMO MODE",
+                        color = if (locations.isNotEmpty()) Color(0x00, 0xFF, 0x88) else Color(0x55, 0x55, 0x55),
+                        fontSize = 9.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace
                     )
-                    ghosts.forEach { p -> drawCircle(color = Color(0xFF, 0x3B, 0x3B).copy(alpha = 0.3f), radius = 5f, center = p) }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MapZoomButton(label: String, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .size(32.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(Color(0x0D, 0x14, 0x26).copy(alpha = 0.85f))
+            .border(1.dp, Color(0x00, 0xF5, 0xFF).copy(alpha = 0.7f), RoundedCornerShape(8.dp))
+            .clickable { onClick() },
+        contentAlignment = Alignment.Center
+    ) {
+        Text(label, color = Color(0x00, 0xF5, 0xFF), fontSize = 18.sp, fontWeight = FontWeight.Bold)
+    }
+}
+
+@Composable
+private fun ThreatOverlay(threat: ThreatLocation, onDismiss: () -> Unit) {
+    val severityColor = when {
+        (threat.threatScore ?: 0) >= 70 -> Color(0xFF, 0x3B, 0x3B)
+        (threat.threatScore ?: 0) >= 40 -> Color(0xFF, 0xA5, 0x00)
+        else -> Color(0x00, 0xFF, 0x88)
+    }
+    val isRealData = threat.caseId != null
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
+            .background(Color(0x0D, 0x14, 0x26).copy(alpha = 0.94f))
+            .border(2.dp, severityColor.copy(alpha = 0.8f), RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            // Drag handle + header row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = if (isRealData) "🔴 THREAT INTELLIGENCE" else "📍 DEMO LOCATION",
+                    color = severityColor,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 12.sp,
+                    letterSpacing = 1.sp
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Box(
+                        modifier = Modifier
+                            .background(severityColor.copy(alpha = 0.2f), RoundedCornerShape(6.dp))
+                            .padding(horizontal = 10.dp, vertical = 4.dp)
+                    ) {
+                        Text(
+                            text = "${threat.threatScore ?: 0}/100",
+                            color = severityColor,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    }
+                    Box(
+                        modifier = Modifier
+                            .size(28.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color(0xFF, 0x3B, 0x3B).copy(alpha = 0.2f))
+                            .clickable { onDismiss() },
+                        contentAlignment = Alignment.Center
+                    ) { Text("✕", color = Color(0xFF, 0x55, 0x55), fontSize = 14.sp, fontWeight = FontWeight.Bold) }
                 }
             }
 
-            // Status badge bottom-left
-            Row(
-                modifier = Modifier.align(Alignment.BottomStart).padding(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(modifier = Modifier.size(8.dp).background(Color(0x00, 0xFF, 0x88), CircleShape))
-                Spacer(modifier = Modifier.width(4.dp))
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Case number + URL (real data) or location (demo)
+            if (isRealData) {
                 Text(
-                    text = "LIVE: ${locations.size} THREAT${if (locations.size != 1) "S" else ""} TRACKED",
-                    color = Color(0x00, 0xFF, 0x88), fontSize = 9.sp,
-                    fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace
+                    text = threat.caseNumber ?: "N/A",
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp,
+                    fontFamily = FontFamily.Monospace
+                )
+                Spacer(modifier = Modifier.height(3.dp))
+                Text(
+                    text = threat.url ?: "No URL",
+                    color = Color(0x00, 0xF5, 0xFF),
+                    fontSize = 12.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            } else {
+                Text(
+                    text = "${threat.city ?: "Unknown"}, ${threat.country ?: "Unknown"}",
+                    color = Color.White,
+                    fontWeight = FontWeight.Medium,
+                    fontSize = 14.sp
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Stats row: Location | Priority | ISP
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                InfoChip("🌍", "${threat.city ?: "?"}, ${threat.country ?: "?"}")
+                if (isRealData) InfoChip("⚡", threat.priority ?: threat.severity ?: "?")
+                if (threat.isp != null) InfoChip("📡", threat.isp ?: "?")
+            }
+
+            if (isRealData) {
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // AI Summary
+                val summary = threat.aiSummary
+                if (!summary.isNullOrEmpty()) {
+                    Text(
+                        text = "AI ANALYSIS",
+                        color = Color(0x88, 0x92, 0xB0),
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.sp
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = summary,
+                        color = Color(0xCC, 0xCC, 0xCC),
+                        fontSize = 11.sp,
+                        lineHeight = 15.sp,
+                        maxLines = 5,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+
+                // Indicators
+                val indicators = threat.aiIndicators
+                if (indicators.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(
+                        text = "THREAT INDICATORS",
+                        color = Color(0x88, 0x92, 0xB0),
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.sp
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        indicators.take(8).forEach { ind ->
+                            Box(
+                                modifier = Modifier
+                                    .background(Color(0xFF, 0x3B, 0x3B).copy(alpha = 0.1f), RoundedCornerShape(10.dp))
+                                    .border(0.5.dp, Color(0xFF, 0x3B, 0x3B).copy(alpha = 0.5f), RoundedCornerShape(10.dp))
+                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                            ) {
+                                Text(
+                                    text = ind,
+                                    color = Color(0xFF, 0x6B, 0x6B),
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                        }
+                    }
+                }
+            } else {
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = "This is a demo marker. Build threat data by creating cases and running analyses.",
+                    color = Color(0x66, 0x66, 0x66),
+                    fontSize = 9.sp,
+                    fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
+                    lineHeight = 13.sp
                 )
             }
         }
@@ -338,44 +642,148 @@ fun ThreatRadarMapCard(locations: List<ThreatLocation>) {
 }
 
 @Composable
-fun WeeklyGraphCard(weeklyData: List<WeeklyGraphData>) {
+private fun InfoChip(emoji: String, text: String) {
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(6.dp))
+            .background(Color.White.copy(alpha = 0.06f))
+            .padding(horizontal = 6.dp, vertical = 3.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(emoji, fontSize = 9.sp)
+        Spacer(modifier = Modifier.width(3.dp))
+        Text(text, color = Color(0xAA, 0xAA, 0xAA), fontSize = 9.sp, fontWeight = FontWeight.Medium)
+    }
+}
+
+@Composable
+fun WeeklyGraphCard(
+    weeklyData: com.example.phishtrack.data.api.WeeklyDashboardResponse?,
+    onDateSelected: (String) -> Unit,
+    onNewCaseClick: () -> Unit
+) {
     Card(
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = Color(0x14, 0x18, 0x29)),
         modifier = Modifier
             .fillMaxWidth()
-            .height(180.dp)
+            .height(240.dp)
             .border(1.dp, Color(0x2A, 0x35, 0x58), RoundedCornerShape(12.dp))
     ) {
-        Box(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-            if (weeklyData.isEmpty()) {
-                // Empty state — no fake data
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+            if (weeklyData == null || weeklyData.currentWeek.isEmpty() || weeklyData.totalThisWeek == 0) {
+                // Empty state
+                Column(modifier = Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+                    Text("📊", fontSize = 32.sp)
+                    Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         text = "No scan data this week yet.",
                         color = Color(0x88, 0x92, 0xB0),
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Normal
                     )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Button(
+                        onClick = onNewCaseClick,
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0x00, 0xF5, 0xFF).copy(alpha = 0.1f)),
+                        shape = RoundedCornerShape(8.dp),
+                        border = BorderStroke(1.dp, Color(0x00, 0xF5, 0xFF))
+                    ) {
+                        Text("New Case", color = Color(0x00, 0xF5, 0xFF), fontWeight = FontWeight.Bold)
+                    }
                 }
             } else {
-                Canvas(modifier = Modifier.fillMaxSize()) {
+                // Summary Line
+                val diff = weeklyData.totalThisWeek - weeklyData.totalLastWeek
+                val arrow = if (diff > 0) "↑" else if (diff < 0) "↓" else "−"
+                val trendColor = if (diff > 0) Color(0xFF, 0x3B, 0x3B) else if (diff < 0) Color(0x00, 0xFF, 0x88) else Color(0x88, 0x92, 0xB0)
+                
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 16.dp)) {
+                    Text(text = "${weeklyData.totalThisWeek} scans this week", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(text = "$arrow ${Math.abs(diff)} from last week", color = trendColor, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                }
+
+                // Chart
+                val textMeasurer = androidx.compose.ui.text.rememberTextMeasurer()
+                val list = weeklyData.currentWeek
+                
+                // Animation states for stagger
+                val animationProgress = list.mapIndexed { index, _ ->
+                    val anim = remember { Animatable(0f) }
+                    LaunchedEffect(Unit) {
+                        kotlinx.coroutines.delay(index * 50L) // stagger
+                        anim.animateTo(
+                            targetValue = 1f,
+                            animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow)
+                        )
+                    }
+                    anim.value
+                }
+
+                Canvas(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .pointerInput(list) {
+                            detectTapGestures { offset ->
+                                val w = size.width
+                                val sectionWidth = w / list.size
+                                val index = (offset.x / sectionWidth).toInt().coerceIn(0, list.size - 1)
+                                onDateSelected(list[index].date)
+                            }
+                        }
+                ) {
                     val w = size.width
                     val h = size.height
-                    val maxVal = weeklyData.maxOfOrNull { it.count }?.coerceAtLeast(1) ?: 1
-                    val barWidth = (w / weeklyData.size) - 16f
+                    val maxVal = list.maxOfOrNull { it.count }?.coerceAtLeast(1) ?: 1
+                    val barWidth = (w / list.size) - 16f
+                    
+                    val today = java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE)
 
                     // Base line
-                    drawLine(color = Color(0x2A, 0x35, 0x58), start = Offset(0f, h - 20f), end = Offset(w, h - 20f), strokeWidth = 2f)
+                    drawLine(color = Color(0x2A, 0x35, 0x58), start = Offset(0f, h - 24f), end = Offset(w, h - 24f), strokeWidth = 2f)
 
-                    weeklyData.forEachIndexed { i, data ->
-                        val barHeight = ((h - 40f) * data.count) / maxVal
-                        val rx = i * (w / weeklyData.size) + 8f
-                        val ry = h - 20f - barHeight
+                    list.forEachIndexed { i, data ->
+                        val animVal = animationProgress[i]
+                        val finalBarHeight = ((h - 48f) * data.count) / maxVal
+                        // minimum visible bar height for 0-count
+                        val actualBarHeight = (finalBarHeight.coerceAtLeast(4f)) * animVal
+                        val rx = i * (w / list.size) + 8f
+                        val ry = h - 24f - actualBarHeight
+                        
+                        val isToday = data.date == today
+                        val barAlpha = if (isToday) 1f else 0.5f
+
                         drawRoundRect(
-                            brush = Brush.verticalGradient(colors = listOf(Color(0x00, 0xF5, 0xFF), Color(0x4A, 0x9E, 0xFF))),
-                            topLeft = Offset(rx, ry), size = Size(barWidth, barHeight),
+                            brush = Brush.verticalGradient(
+                                colors = listOf(Color(0x00, 0xF5, 0xFF).copy(alpha = barAlpha), Color(0x4A, 0x9E, 0xFF).copy(alpha = barAlpha))
+                            ),
+                            topLeft = Offset(rx, ry), size = Size(barWidth, actualBarHeight),
                             cornerRadius = CornerRadius(6f, 6f)
+                        )
+
+                        // Count Label on top
+                        if (actualBarHeight > 4f) {
+                            val countText = textMeasurer.measure(
+                                text = data.count.toString(),
+                                style = androidx.compose.ui.text.TextStyle(color = Color(0x00, 0xF5, 0xFF), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                            )
+                            drawText(
+                                textLayoutResult = countText,
+                                topLeft = Offset(rx + (barWidth - countText.size.width) / 2f, ry - countText.size.height - 4f)
+                            )
+                        }
+
+                        // X-axis Day Label
+                        val dateObj = try { java.time.LocalDate.parse(data.date) } catch (e: Exception) { null }
+                        val dayStr = dateObj?.dayOfWeek?.getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.getDefault()) ?: ""
+                        val dayText = textMeasurer.measure(
+                            text = if (isToday) "Today" else dayStr,
+                            style = androidx.compose.ui.text.TextStyle(color = if (isToday) Color(0x00, 0xF5, 0xFF) else Color(0x88, 0x92, 0xB0), fontSize = 10.sp, fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal)
+                        )
+                        drawText(
+                            textLayoutResult = dayText,
+                            topLeft = Offset(rx + (barWidth - dayText.size.width) / 2f, h - 20f)
                         )
                     }
                 }
@@ -411,7 +819,7 @@ fun CaseItemCard(case: CaseResponse, onClick: () -> Unit) {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = case.case_number,
+                    text = case.caseNumber,
                     color = Color.White,
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Bold,
@@ -453,10 +861,11 @@ fun CaseItemCard(case: CaseResponse, onClick: () -> Unit) {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = case.status,
+                    text = case.status.replace("_", " "),
                     color = when (case.status) {
                         "Open" -> Color(0x00, 0xF5, 0xFF)
                         "Closed" -> Color(0x00, 0xFF, 0x88)
+                        "False_Positive" -> Color(0xFF, 0x3B, 0x3B)
                         else -> Color(0xFF, 0xA5, 0x00)
                     },
                     fontSize = 12.sp,
@@ -464,7 +873,7 @@ fun CaseItemCard(case: CaseResponse, onClick: () -> Unit) {
                 )
 
                 Text(
-                    text = case.created_at.split("T").firstOrNull() ?: "",
+                    text = case.createdAt.split("T").firstOrNull() ?: "",
                     color = Color(0x88, 0x92, 0xB0).copy(alpha = 0.6f),
                     fontSize = 11.sp
                 )

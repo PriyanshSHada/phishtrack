@@ -1,5 +1,6 @@
 package com.example.phishtrack.data.api
 
+import okhttp3.ResponseBody
 import retrofit2.http.*
 
 interface ApiService {
@@ -21,7 +22,11 @@ interface ApiService {
 
   // --- Cases ---
   @GET("api/cases")
-  suspend fun getCases(): List<CaseResponse>
+  suspend fun getCases(
+      @Query("status") status: String? = null,
+      @Query("priority") priority: String? = null,
+      @Query("date") date: String? = null
+  ): List<CaseResponse>
 
   @POST("api/cases")
   suspend fun createCase(@Body req: CreateCaseRequest): CaseResponse
@@ -58,6 +63,10 @@ interface ApiService {
   @GET("api/reports/{id}/verify")
   suspend fun verifyReport(@Path("id") id: String): VerifyReportResponse
 
+  @GET("api/reports/{id}/pdf")
+  @Streaming
+  suspend fun downloadReportPdf(@Path("id") id: String): ResponseBody
+
   // --- Dashboard ---
   @GET("api/dashboard/stats")
   suspend fun getDashboardStats(): StatsResponse
@@ -69,7 +78,7 @@ interface ApiService {
   suspend fun getThreatMap(): List<ThreatLocation>
 
   @GET("api/dashboard/weekly")
-  suspend fun getWeeklyGraph(): List<WeeklyGraphData>
+  suspend fun getWeeklyGraph(): WeeklyDashboardResponse
 
   // --- Audit ---
   @GET("api/audit/logs")

@@ -36,6 +36,7 @@ fun NewCaseScreen(
     var selectedSource by remember { mutableStateOf("Email") }
     var selectedPriority by remember { mutableStateOf("High") }
     var tagsInput by remember { mutableStateOf("") }
+    var isSubmitting by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
     val scrollState = rememberScrollState()
@@ -178,8 +179,10 @@ fun NewCaseScreen(
                         Text(
                             text = source,
                             color = if (isSelected) Color(0x00, 0xF5, 0xFF) else Color(0x88, 0x92, 0xB0),
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                         )
                     }
                 }
@@ -260,30 +263,41 @@ fun NewCaseScreen(
             Spacer(modifier = Modifier.height(40.dp))
 
             // Submit Button
+            val isValidUrl = url.trim().isNotEmpty() && (url.trim().startsWith("http://") || url.trim().startsWith("https://"))
+            
             Button(
                 onClick = {
-                    if (url.trim().isEmpty()) {
-                        Toast.makeText(context, "Phishing URL is required", Toast.LENGTH_SHORT).show()
-                    } else if (!url.trim().startsWith("http://") && !url.trim().startsWith("https://")) {
-                        Toast.makeText(context, "URL must start with http:// or https://", Toast.LENGTH_LONG).show()
-                    } else {
+                    if (isValidUrl && !isSubmitting) {
+                        isSubmitting = true
                         val tagsList = if (tagsInput.trim().isEmpty()) emptyList() else tagsInput.split(",").map { it.trim() }
                         onSubmitCase(url.trim(), description.trim().ifEmpty { null }, selectedSource, selectedPriority, tagsList)
                     }
                 },
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0x00, 0xF5, 0xFF)),
+                enabled = isValidUrl && !isSubmitting,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0x00, 0xF5, 0xFF),
+                    disabledContainerColor = Color(0x2A, 0x35, 0x58)
+                ),
                 shape = RoundedCornerShape(8.dp),
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(52.dp)
             ) {
-                Text(
-                    text = "ANALYZE LINK SAFELY",
-                    color = Color(0x0A, 0x0E, 0x1A),
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 15.sp,
-                    letterSpacing = 1.sp
-                )
+                if (isSubmitting) {
+                    CircularProgressIndicator(
+                        color = Color(0x0A, 0x0E, 0x1A),
+                        strokeWidth = 2.dp,
+                        modifier = Modifier.size(24.dp)
+                    )
+                } else {
+                    Text(
+                        text = "ANALYZE LINK SAFELY",
+                        color = Color(0x0A, 0x0E, 0x1A),
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 15.sp,
+                        letterSpacing = 1.sp
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(48.dp))

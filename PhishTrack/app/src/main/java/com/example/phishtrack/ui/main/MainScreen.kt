@@ -8,6 +8,7 @@ import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -30,8 +31,9 @@ fun MainScreen(
     onCaseClick: (String) -> Unit,
     onLogoutClick: () -> Unit
 ) {
-    var selectedTab by remember { mutableStateOf(0) }
+    var selectedTab by remember { mutableIntStateOf(0) }
     var analystName by remember { mutableStateOf("SOC Analyst") }
+    var selectedDateFilter by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(Unit) {
         try {
@@ -105,10 +107,16 @@ fun MainScreen(
                             "Cases" -> selectedTab = 1
                             "Profile" -> selectedTab = 2
                         }
+                    },
+                    onDateFilterClick = { date ->
+                        selectedDateFilter = date
+                        selectedTab = 1
                     }
                 )
                 1 -> CasesListScreen(
                     casesRepository = casesRepository,
+                    initialDateFilter = selectedDateFilter,
+                    onClearDateFilter = { selectedDateFilter = null },
                     onCaseClick = onCaseClick
                 )
                 2 -> ProfileScreen(

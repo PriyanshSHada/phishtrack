@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"/>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #0d1426; }
+  #container { position: relative; width: 100%; height: 100%; overflow: hidden; }
+
+  /* World map PNG background */
+  #mapImg {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    object-fit: fill;
+    transform-origin: 0 0;
+    pointer-events: none;
+    user-select: none;
+    -webkit-user-select: none;
+    /* Fallback if image fails to load */
+    background: #0d1426;
+  }
+
+  /* Threat canvas — same size, sits on top of image */
+  #canvas {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    touch-action: none;
+  }
+
+  /* Zoom controls */
+  #zoomCtrl {
+    position: absolute;
+    top: 8px; right: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    z-index: 10;
+  }
+  .zbtn {
+    width: 28px; height: 28px;
+    background: rgba(13,20,38,0.92);
+    border: 1px solid rgba(0,245,255,0.55);
+    border-radius: 6px;
+    color: #00f5ff;
+    font-size: 16px;
+    font-weight: bold;
+    font-family: monospace;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .zbtn:active { background: rgba(0,245,255,0.15); }
+  .zbtn.reset { border-color: rgba(42,53,88,0.8); color: #8892b0; font-size: 13px; }
+
+  /* Zoom level badge */
+  #zoomLabel {
+    position: absolute;
+    bottom: 8px; right: 8px;
+    background: rgba(10,14,26,0.78);
+    border: 1px solid rgba(0,245,255,0.3);
+    border-radius: 4px;
+    color: #00f5ff;
+    font-size: 9px;
+    font-weight: bold;
+    font-family: monospace;
+    padding: 2px 5px;
+    z-index: 10;
+  }
+
+  /* Popup tooltip */
+  #popup {
+    position: absolute;
+    background: #141829;
+    border: 1px solid #2a3558;
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-family: monospace;
+    font-size: 12px;
+    color: #fff;
+    pointer-events: none;
+    display: none;
+    z-index: 20;
+    white-space: nowrap;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+  }
+  #popup .city { color: #00f5ff; font-weight: bold; font-size: 13px; }
+  #popup .score { margin-top: 3px; }
+</style>
+</head>
+<body>
+<div id="container">
+  <img id="mapImg" src="world_map.png" draggable="false"/>
+  <canvas id="canvas"></canvas>
+
+  <div id="zoomCtrl">
+    <div class="zbtn" id="btnIn">+</div>
+    <div class="zbtn" id="btnOut">−</div>
+    <div class="zbtn reset" id="btnReset">⊡</div>
+  </div>
+  <div id="zoomLabel">1.0×</div>
+  <div id="popup"><div class="city" id="popCity"></div><div class="score" id="popScore"></div></div>
+</div>
+
+<script>
+// ─── Helpers ──────────────────────────────────────────────────────
+function W() { return window.innerWidth  || document.documentElement.clientWidth  || 400; }
+function H() { return window.innerHeight || document.documentElement.clientHeight || 240; }
+
+const img     = document.getElementById('mapImg');
+const canvas  = document.getElementById('canvas');
+const ctx     = canvas.getContext('2d');
+const popup   = document.getElementById('popup');
+const zoomLbl = document.getElementById('zoomLabel');
+
+canvas.width  = W();
+canvas.height = H();
+let scale = 1, tx = 0, ty = 0;
+let isDragging = false, lastX = 0, lastY = 0;
+let isPinching = false, lastDist = 0;
+const MIN_SCALE = 0.9, MAX_SCALE = 10;
+
+function applyTransform() {
+  img.style.transform = `matrix(${scale},0,0,${scale},${tx},${ty})`;
+  zoomLbl.textContent = scale.toFixed(1) + '×';
+}
+
+function clampPan() {
+  const W = canvas.clientWidth, H = canvas.clientHeight;
+  const maxTx = W * 0.1, maxTy = H * 0.1;
+  const minTx = W - W * scale - maxTx, minTy = H - H * scale - maxTy;
+  tx = Math.min(maxTx, Math.max(minTx, tx));
+  ty = Math.min(maxTy, Math.max(minTy, ty));
+}
+
+function zoomAround(cx, cy, factor) {
+  const newScale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, scale * factor));
+  const ratio = newScale / scale;
+  tx = cx - ratio * (cx - tx);
+  ty = cy - ratio * (cy - ty);
+  scale = newScale;
+  clampPan();
+  applyTransform();
+}
+
+function resetView() {
+  scale = 1; tx = 0; ty = 0;
+  applyTransform();
+}
+
+// Button controls
+document.getElementById('btnIn').addEventListener('click', () => {
+  const W = canvas.clientWidth, H = canvas.clientHeight;
+  zoomAround(W/2, H/2, 1.5);
+});
+document.getElementById('btnOut').addEventListener('click', () => {
+  const W = canvas.clientWidth, H = canvas.clientHeight;
+  zoomAround(W/2, H/2, 1/1.5);
+});
+document.getElementById('btnReset').addEventListener('click', resetView);
+
+// ─── Touch/Mouse events ───────────────────────────────────────────
+canvas.addEventListener('touchstart', e => {
+  e.preventDefault();
+  if (e.touches.length === 1) {
+    isDragging = true;
+    lastX = e.touches[0].clientX;
+    lastY = e.touches[0].clientY;
+  } else if (e.touches.length === 2) {
+    isPinching = true; isDragging = false;
+    lastDist = Math.hypot(
+      e.touches[0].clientX - e.touches[1].clientX,
+      e.touches[0].clientY - e.touches[1].clientY
+    );
+  }
+}, { passive: false });
+
+canvas.addEventListener('touchmove', e => {
+  e.preventDefault();
+  if (e.touches.length === 1 && isDragging) {
+    tx += e.touches[0].clientX - lastX;
+    ty += e.touches[0].clientY - lastY;
+    lastX = e.touches[0].clientX;
+    lastY = e.touches[0].clientY;
+    clampPan();
+    applyTransform();
+  } else if (e.touches.length === 2 && isPinching) {
+    const dist = Math.hypot(
+      e.touches[0].clientX - e.touches[1].clientX,
+      e.touches[0].clientY - e.touches[1].clientY
+    );
+    const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+    const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+    zoomAround(midX, midY, dist / lastDist);
+    lastDist = dist;
+  }
+}, { passive: false });
+
+canvas.addEventListener('touchend', e => {
+  if (e.touches.length === 0) { isDragging = false; isPinching = false; }
+});
+
+function project(lon, lat) {
+  const w = W(), h = H();
+  const baseX = ((lon + 180) / 360) * w;
+  const baseY = ((90 - lat)  / 180) * h;
+  return { x: baseX * scale + tx, y: baseY * scale + ty };
+}
+
+// ─── Threat data & animation ───────────────────────────────────────
+let threats = [
+  { lat: 37,  lng: -95, score: 85, label: 'United States' },
+  { lat: 51,  lng: 10,  score: 72, label: 'Germany' },
+  { lat: 35,  lng: 105, score: 91, label: 'China' },
+  { lat: -14, lng: -51, score: 60, label: 'Brazil' },
+  { lat: 28,  lng: 77,  score: 78, label: 'India' }
+];
+
+function scoreColor(score) {
+  if (score >= 70) return { fill: '#ff3b3b', glow: 'rgba(255,59,59,', rgb: '255,59,59' };
+  if (score >= 40) return { fill: '#ffa500', glow: 'rgba(255,165,0,', rgb: '255,165,0' };
+  return              { fill: '#00ff88', glow: 'rgba(0,255,136,',  rgb: '0,255,136' };
+}
+
+function drawThreats(t) {
+  const w = W(), h = H();
+  canvas.width  = w;
+  canvas.height = h;
+  ctx.clearRect(0, 0, w, h);
+  // Dark ocean fallback (visible if PNG hasn't loaded yet)
+  ctx.fillStyle = '#0d1426';
+  ctx.fillRect(0, 0, w, h);
+
+  for (const loc of threats) {
+    if (loc.lat == null || loc.lng == null) continue;
+    const { x, y } = project(loc.lng, loc.lat);
+    if (x < -20 || x > w + 20 || y < -20 || y > h + 20) continue;
+
+    const c = scoreColor(loc.score);
+    const pulse = (Math.sin(t * 2.5 + loc.lng * 0.1) + 1) / 2; // 0→1
+
+    // Outer glow ring — pulses outward
+    const ringR = (4 + 14 * pulse) * Math.min(scale, 2);
+    ctx.beginPath();
+    ctx.arc(x, y, ringR, 0, Math.PI * 2);
+    ctx.strokeStyle = `rgba(${c.rgb},${0.75 * (1 - pulse)})`;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // Mid ring (static subtle)
+    ctx.beginPath();
+    ctx.arc(x, y, 6 * Math.min(scale, 2), 0, Math.PI * 2);
+    ctx.strokeStyle = `rgba(${c.rgb},0.3)`;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // Core dot
+    const dotR = 4 * Math.min(scale, 2);
+    ctx.beginPath();
+    ctx.arc(x, y, dotR, 0, Math.PI * 2);
+    ctx.fillStyle = c.fill;
+    ctx.shadowColor = c.fill;
+    ctx.shadowBlur = 8;
+    ctx.fill();
+    ctx.shadowBlur = 0;
+
+    // White centre pinpoint
+    ctx.beginPath();
+    ctx.arc(x, y, 1.5, 0, Math.PI * 2);
+    ctx.fillStyle = '#ffffff';
+    ctx.fill();
+  }
+}
+
+// ─── Popup on tap ──────────────────────────────────────────────────
+canvas.addEventListener('click', e => {
+  const rect = canvas.getBoundingClientRect();
+  const cx = e.clientX - rect.left;
+  const cy = e.clientY - rect.top;
+
+  let hit = null;
+  const hitR = 16;
+  for (const loc of threats) {
+    if (loc.lat == null || loc.lng == null) continue;
+    const { x, y } = project(loc.lng, loc.lat);
+    if (Math.hypot(cx - x, cy - y) < hitR) { hit = loc; break; }
+  }
+
+  if (hit) {
+    const c = scoreColor(hit.score);
+    document.getElementById('popCity').textContent  = hit.label || 'Unknown';
+    document.getElementById('popScore').innerHTML =
+      'Threat Score: <span style="color:' + c.fill + ';font-weight:bold">' + hit.score + '</span>';
+    // Position popup near the dot, flipping if near edge
+    let px = e.clientX + 12, py = e.clientY - 36;
+    if (px + 160 > window.innerWidth)  px = e.clientX - 170;
+    if (py < 0) py = e.clientY + 12;
+    popup.style.left = px + 'px';
+    popup.style.top  = py + 'px';
+    popup.style.display = 'block';
+  } else {
+    popup.style.display = 'none';
+  }
+});
+
+// ─── Resize handler ────────────────────────────────────────────────
+function onResize() {
+  canvas.width  = W();
+  canvas.height = H();
+}
+window.addEventListener('resize', onResize);
+
+// ─── Start after page is fully loaded ──────────────────────────────
+window.addEventListener('load', function() {
+  onResize();
+  applyTransform();
+  let startTime = null;
+  function loop(ts) {
+    if (!startTime) startTime = ts;
+    drawThreats((ts - startTime) / 1000);
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+});
+
+// Fallback: start even if load event already fired
+setTimeout(function() {
+  if (!canvas.width || canvas.width < 10) {
+    onResize(); applyTransform();
+  }
+}, 300);
+
+// ─── External interface (called from Kotlin via evaluateJavascript) ─
+function updateThreats(locations) {
+  threats = locations;
+  popup.style.display = 'none';
+}
+</script>
+</body>
+</html>

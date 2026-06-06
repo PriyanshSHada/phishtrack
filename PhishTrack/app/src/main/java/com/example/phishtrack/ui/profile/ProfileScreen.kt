@@ -1,7 +1,10 @@
 package com.example.phishtrack.ui.profile
 
+import android.content.Intent
 import android.widget.Toast
 import androidx.compose.foundation.background
+import androidx.core.content.FileProvider
+import java.io.File
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -42,10 +45,59 @@ fun ProfileScreen(
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
     var profileState by remember { mutableStateOf<UiState<UserProfile>>(UiState.Loading) }
 
     var biometricEnabled by remember { mutableStateOf(authRepository.isBiometricEnabled()) }
     var pinLockEnabled by remember { mutableStateOf(authRepository.isPinLockEnabled()) }
+    var showPinDialog by remember { mutableStateOf(false) }
+    var newPin by remember { mutableStateOf("") }
+
+    if (showPinDialog) {
+        AlertDialog(
+            onDismissRequest = { showPinDialog = false; newPin = "" },
+            title = { Text("Set App PIN", color = Color.White) },
+            text = {
+                Column {
+                    Text("Enter a 4-digit PIN to secure the app:", color = Color(0x88, 0x92, 0xB0), fontSize = 13.sp)
+                    Spacer(modifier = Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = newPin,
+                        onValueChange = { if (it.length <= 4 && it.all { c -> c.isDigit() }) newPin = it },
+                        label = { Text("4-digit PIN") },
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Color(0x00, 0xF5, 0xFF),
+                            unfocusedBorderColor = Color(0x2A, 0x35, 0x58),
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White
+                        )
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (newPin.length == 4) {
+                            authRepository.setPin(newPin)
+                            Toast.makeText(context, "PIN set successfully", Toast.LENGTH_SHORT).show()
+                            showPinDialog = false
+                            newPin = ""
+                        } else {
+                            Toast.makeText(context, "PIN must be 4 digits", Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0x00, 0xF5, 0xFF))
+                ) { Text("Save", color = Color(0x0A, 0x0E, 0x1A)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showPinDialog = false; newPin = "" }) {
+                    Text("Cancel", color = Color(0x88, 0x92, 0xB0))
+                }
+            },
+            containerColor = Color(0x14, 0x18, 0x29)
+        )
+    }
 
     LaunchedEffect(Unit) {
         authRepository.getProfile().collect { result ->
@@ -56,14 +108,15 @@ fun ProfileScreen(
         }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0x0A, 0x0E, 0x1A))
-            .verticalScroll(rememberScrollState())
-            .padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color(0x0A, 0x0E, 0x1A))
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
         Spacer(modifier = Modifier.height(16.dp))
 
         // Premium Analyst ID Card
@@ -119,6 +172,9 @@ fun ProfileScreen(
                             onCheckedChange = { 
                                 biometricEnabled = it 
                                 authRepository.setBiometricEnabled(it)
+                                coroutineScope.launch {
+                                    snackbarHostState.showSnackbar("Biometric auth ${if(it) "enabled" else "disabled"}")
+                                }
                             },
                             colors = SwitchDefaults.colors(checkedThumbColor = Color(0x00, 0xF5, 0xFF))
                         )
@@ -139,9 +195,11 @@ fun ProfileScreen(
                             onCheckedChange = { 
                                 pinLockEnabled = it 
                                 authRepository.setPinLockEnabled(it)
-                                if (it && authRepository.getPin() == null) {
-                                    authRepository.setPin("1234") // Default placeholder PIN for now
-                                    Toast.makeText(context, "PIN set to default: 1234", Toast.LENGTH_SHORT).show()
+                                coroutineScope.launch {
+                                    snackbarHostState.showSnackbar("PIN Lock ${if(it) "enabled" else "disabled"}")
+                                }
+                                if (it) {
+                                    showPinDialog = true
                                 }
                             },
                             colors = SwitchDefaults.colors(checkedThumbColor = Color(0x00, 0xF5, 0xFF))
@@ -188,10 +246,20 @@ fun ProfileScreen(
                                 val csv = StringBuilder()
                                 csv.append("ID,Case Number,URL,Source,Priority,Status,Created At\n")
                                 cases.forEach { c ->
-                                    csv.append("${c.id},${c.case_number},${c.url},${c.source},${c.priority},${c.status},${c.created_at}\n")
+                                    csv.append("${c.id},${c.caseNumber},${c.url},${c.source},${c.priority},${c.status},${c.createdAt}\n")
                                 }
-                                // Simulate file export
-                                Toast.makeText(context, "Exported ${cases.size} cases to CSV successfully!", Toast.LENGTH_LONG).show()
+                                // Write CSV to cache file and share via FileProvider
+                                val file = File(context.cacheDir, "phishtrack_cases.csv")
+                                file.writeText(csv.toString())
+                                val uri = FileProvider.getUriForFile(
+                                    context, "${context.packageName}.fileprovider", file
+                                )
+                                val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                    type = "text/csv"
+                                    putExtra(Intent.EXTRA_STREAM, uri)
+                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                }
+                                context.startActivity(Intent.createChooser(shareIntent, "Export CSV"))
                             }
                         }
                     },
@@ -226,6 +294,12 @@ fun ProfileScreen(
         }
 
         Spacer(modifier = Modifier.height(80.dp))
+    }
+    
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier.align(Alignment.BottomCenter)
+        )
     }
 }
 
@@ -277,7 +351,7 @@ fun AnalystIdCard(profile: UserProfile) {
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "Analyst ID: ${profile.analyst_id ?: "PSH-${profile.id.take(4).uppercase()}"}",
+                    text = "Analyst ID: ${profile.analystId ?: "PSH-${profile.id.take(4).uppercase()}"}",
                     color = Color(0x88, 0x92, 0xB0),
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Medium,
