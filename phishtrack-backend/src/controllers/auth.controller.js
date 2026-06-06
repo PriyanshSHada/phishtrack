@@ -14,8 +14,12 @@ exports.register = async (req, res, next) => {
     const user = await prisma.user.create({
       data: { email, password: passwordHash, name, organization, is_verified: true }
     });
-    const token = signJwt({ userId: user.id });
-    res.status(201).json({ token, user: { id: user.id, email: user.email, name: user.name } });
+    res.status(201).json({
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      analyst_id: user.analyst_id
+    });
   } catch (err) {
     console.error(err);
     next(err);
@@ -111,7 +115,14 @@ exports.me = async (req, res, next) => {
     if (!payload || !payload.userId) return res.status(401).json({ error: 'Not authenticated' });
     const user = await prisma.user.findUnique({ where: { id: payload.userId } });
     if (!user) return res.status(404).json({ error: 'User not found' });
-    res.json({ id: user.id, email: user.email, name: user.name, organization: user.organization });
+    res.json({
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      organization: user.organization,
+      analystId: user.analyst_id,
+      role: user.role
+    });
   } catch (err) {
     console.error(err);
     next(err);

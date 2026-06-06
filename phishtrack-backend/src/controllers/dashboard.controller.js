@@ -23,21 +23,42 @@ exports.getRecentCases = async (req, res, next) => {
 
 exports.getWeeklyGraph = async (req, res, next) => {
   try {
-    const now = new Date();
-    const days = 7;
-    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (days - 1));
-    const cases = await prisma.case.findMany({ where: { created_at: { gte: start } } });
-    const buckets = {};
-    for (let i = 0; i < days; i++) {
-      const d = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i);
-      const key = d.toISOString().slice(0, 10);
-      buckets[key] = 0;
-    }
-    cases.forEach(c => {
-      const key = new Date(c.created_at).toISOString().slice(0, 10);
-      if (buckets[key] !== undefined) buckets[key]++;
+    // 1. Get current week data (last 7 days including today)
+    const currentWeekRaw = await prisma.$queryRaw`
+      SELECT
+        TO_CHAR(d.date, 'YYYY-MM-DD') as date,
+        COALESCE(COUNT(c.id), 0)::int as count
+      FROM generate_series(
+        CURRENT_DATE - INTERVAL '27 days',
+        CURRENT_DATE,
+        '1 day'::interval
+      ) AS d(date)
+      LEFT JOIN "Case" c ON DATE(c.created_at) = DATE(d.date)
+      GROUP BY d.date
+      ORDER BY d.date ASC;
+    `;
+
+    // 2. Get totals for KPIs
+    const totalThisWeekRes = await prisma.$queryRaw`
+      SELECT COUNT(*)::int as total
+      FROM "Case"
+      WHERE created_at >= CURRENT_DATE - INTERVAL '6 days';
+    `;
+    const totalThisWeek = totalThisWeekRes[0].total;
+
+    const totalLastWeekRes = await prisma.$queryRaw`
+      SELECT COUNT(*)::int as total
+      FROM "Case"
+      WHERE created_at >= CURRENT_DATE - INTERVAL '13 days'
+        AND created_at < CURRENT_DATE - INTERVAL '6 days';
+    `;
+    const totalLastWeek = totalLastWeekRes[0].total;
+
+    res.json({
+      currentWeek: currentWeekRaw,
+      totalThisWeek,
+      totalLastWeek
     });
-    res.json(Object.entries(buckets).map(([date, count]) => ({ date, count })));
   } catch (err) {
     next(err);
   }

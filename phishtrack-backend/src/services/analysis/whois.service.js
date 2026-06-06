@@ -47,6 +47,6 @@ exports.getWhoisData = async (urlStr) => {
     };
   } catch (err) {
     console.error('WHOIS Lookup Error:', err);
-    return { error: err.message || 'WHOIS lookup failed' };
+    return null; // Return null so analysis doesn't store an error object
   }
 };

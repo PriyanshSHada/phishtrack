@@ -34,12 +34,12 @@ exports.runAnalysis = async (req, res, next) => {
       puppeteerService.runSandbox(url)
     ]);
 
-    const whois = whoisResult.status === 'fulfilled' ? whoisResult.value : { error: whoisResult.reason?.message };
-    const ipGeo = ipgeoResult.status === 'fulfilled' ? ipgeoResult.value : { error: ipgeoResult.reason?.message };
-    const ssl = sslResult.status === 'fulfilled' ? sslResult.value : { error: sslResult.reason?.message };
-    const virustotal = virustotalResult.status === 'fulfilled' ? virustotalResult.value : { error: virustotalResult.reason?.message };
-    const similarity = similarityResult.status === 'fulfilled' ? similarityResult.value : { error: similarityResult.reason?.message };
-    const sandbox = sandboxResult.status === 'fulfilled' ? sandboxResult.value : { error: sandboxResult.reason?.message };
+    const whois = whoisResult.status === 'fulfilled' && !whoisResult.value?.error ? whoisResult.value : null;
+    const ipGeo = ipgeoResult.status === 'fulfilled' && ipgeoResult.value !== null ? ipgeoResult.value : null;
+    const ssl = sslResult.status === 'fulfilled' ? sslResult.value : { valid: false, error: 'SSL check failed' };
+    const virustotal = virustotalResult.status === 'fulfilled' ? virustotalResult.value : null;
+    const similarity = similarityResult.status === 'fulfilled' ? similarityResult.value : null;
+    const sandbox = sandboxResult.status === 'fulfilled' ? sandboxResult.value : {};
 
     // Format results to run GPT analysis
     const analysisData = {

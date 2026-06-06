@@ -1,11 +1,21 @@
 const puppeteer = require('puppeteer-core');
 const crypto = require('crypto');
+const os = require('os');
+
+function getBrowserExecutablePath() {
+  // Render / Linux environments: Chromium installed via buildpack
+  if (os.platform() === 'linux') {
+    return process.env.CHROMIUM_PATH || '/usr/bin/chromium-browser';
+  }
+  // Windows dev environment: uses Edge
+  return 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe';
+}
 
 exports.runSandbox = async (url) => {
   let browser;
   try {
     browser = await puppeteer.launch({
-      executablePath: 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
+      executablePath: getBrowserExecutablePath(),
       headless: 'new',
       args: ['--no-sandbox', '--disable-setuid-sandbox']
     });

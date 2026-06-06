@@ -32,6 +32,6 @@ exports.getIpGeoData = async (urlStr) => {
     };
   } catch (err) {
     console.error('IP Geo Error:', err);
-    return { error: err.message || 'IP Geolocation failed' };
+    return null; // Return null instead of error string so threat map doesn't crash on this record
   }
 };
