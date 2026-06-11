@@ -80,6 +80,18 @@ data class CaseResponse(
     @SerializedName("updated_at") val updatedAt: String
 )
 
+data class PaginationInfo(
+    val page: Int,
+    val limit: Int,
+    val total: Int,
+    val pages: Int
+)
+
+data class PaginatedCasesResponse(
+    val data: List<CaseResponse>,
+    val pagination: PaginationInfo
+)
+
 data class CaseDetailResponse(
     val id: String,
     @SerializedName("case_number") val caseNumber: String,

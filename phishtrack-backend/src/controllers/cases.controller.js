@@ -3,7 +3,7 @@ const { generateCaseNumber } = require('../utils/caseNumber.util');
 
 exports.getAllCases = async (req, res, next) => {
   try {
-    const { status, priority, date } = req.query;
+    const { status, priority, date, page, limit } = req.query;
     const where = {};
     if (status) {
       if (status === 'Open') {
@@ -23,8 +23,30 @@ exports.getAllCases = async (req, res, next) => {
       };
     }
 
-    const cases = await prisma.case.findMany({ where, orderBy: { created_at: 'desc' } });
-    res.json(cases);
+    // Pagination
+    const pageNum = Math.max(1, parseInt(page) || 1);
+    const pageSize = Math.min(100, Math.max(1, parseInt(limit) || 20));
+    const skip = (pageNum - 1) * pageSize;
+
+    const [cases, total] = await Promise.all([
+      prisma.case.findMany({
+        where,
+        orderBy: { created_at: 'desc' },
+        skip,
+        take: pageSize
+      }),
+      prisma.case.count({ where })
+    ]);
+
+    res.json({
+      data: cases,
+      pagination: {
+        page: pageNum,
+        limit: pageSize,
+        total,
+        pages: Math.ceil(total / pageSize)
+      }
+    });
   } catch (err) {
     next(err);
   }

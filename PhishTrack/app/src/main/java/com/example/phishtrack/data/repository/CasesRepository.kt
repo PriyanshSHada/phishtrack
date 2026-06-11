@@ -34,9 +34,10 @@ class CasesRepository @Inject constructor(
     }
 
     // Refresh cases from server and update local cache
-    suspend fun refreshCases(status: String? = null, priority: String? = null, date: String? = null): Result<Unit> {
+    suspend fun refreshCases(status: String? = null, priority: String? = null, date: String? = null, page: Int = 1, limit: Int = 50): Result<Unit> {
         return try {
-            val networkCases = apiService.getCases(status, priority, date)
+            val paginatedResponse = apiService.getCases(status, priority, date, page, limit)
+            val networkCases = paginatedResponse.data
             val entities = networkCases.map { case ->
                 CaseEntity(
                     id = case.id,
@@ -52,11 +53,25 @@ class CasesRepository @Inject constructor(
                     updatedAt = case.updatedAt
                 )
             }
-            caseDao.clearAllCases()
+            // Only clear cache on first page; append for subsequent pages
+            if (page <= 1) {
+                caseDao.clearAllCases()
+            }
             caseDao.insertCases(entities)
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
+        }
+    }
+
+    // Get total count of cases from the server
+    suspend fun getCasesCount(status: String? = null, priority: String? = null, date: String? = null): Int {
+        return try {
+            val response = apiService.getCases(status, priority, date, 1, 1)
+            response.pagination.total
+        } catch (e: Exception) {
+            caseDao.getAllCasesFlow().collect { list -> return@getCasesCount list.size }
+            0
         }
     }
 

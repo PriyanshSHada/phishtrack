@@ -25,6 +25,15 @@ interface ApiService {
   suspend fun getCases(
       @Query("status") status: String? = null,
       @Query("priority") priority: String? = null,
+      @Query("date") date: String? = null,
+      @Query("page") page: Int? = null,
+      @Query("limit") limit: Int? = null
+  ): PaginatedCasesResponse
+
+  @GET("api/cases")
+  suspend fun getCasesLegacy(
+      @Query("status") status: String? = null,
+      @Query("priority") priority: String? = null,
       @Query("date") date: String? = null
   ): List<CaseResponse>
 

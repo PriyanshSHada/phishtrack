@@ -64,12 +64,9 @@ fun MainNavigation(
                   }
               },
               onBiometricClick = {
-                  // Quick bypass for biometric: log in directly to Main if session exists or test bypass
+                  // Quick bypass for biometric: log in directly to Main if session exists
                   if (tokenManager.getToken() != null) {
                       backStack.replaceTop(Main)
-                  } else {
-                      // Login via test account as biometric mock fallback
-                      authViewModel.login("test@example.com", "Test@1234")
                   }
               }
           )

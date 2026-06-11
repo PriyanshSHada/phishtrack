@@ -140,9 +140,9 @@ fun DashboardScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Interactive Cyber Threat Radar Map
+            // Interactive Satellite Threat Map
             Text(
-                text = "GLOBAL THREAT RADAR MAP",
+                text = "SATELLITE THREAT MAP",
                 color = Color(0x88, 0x92, 0xB0),
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
@@ -283,16 +283,7 @@ fun ThreatRadarMapCard(locations: List<ThreatLocation>) {
     var mapRef by remember { mutableStateOf<org.maplibre.android.maps.MapLibreMap?>(null) }
     var selectedThreat by remember { mutableStateOf<ThreatLocation?>(null) }
 
-    val demoLocations = remember {
-        listOf(
-            ThreatLocation(null, "US", "United States",  39.5,  -98.4, 85, null, null, null, null, null, null, emptyList(), null),
-            ThreatLocation(null, "DE", "Germany",        51.2,   10.5, 72, null, null, null, null, null, null, emptyList(), null),
-            ThreatLocation(null, "CN", "China",          36.0,  104.0, 91, null, null, null, null, null, null, emptyList(), null),
-            ThreatLocation(null, "BR", "Brazil",        -10.0,  -53.0, 60, null, null, null, null, null, null, emptyList(), null),
-            ThreatLocation(null, "IN", "India",          22.5,   80.7, 78, null, null, null, null, null, null, emptyList(), null),
-        )
-    }
-    val displayLocations = locations.ifEmpty { demoLocations }
+    val hasRealData = locations.isNotEmpty()
 
     Column {
         Card(
@@ -326,27 +317,41 @@ fun ThreatRadarMapCard(locations: List<ThreatLocation>) {
 
                             mv.getMapAsync { map ->
                                 mapRef = map
+                                // Remove MapLibre logo/attribution from the map
+                                map.uiSettings.isAttributionEnabled = false
+                                map.uiSettings.isLogoEnabled = false
                                 map.cameraPosition = CameraPosition.Builder()
                                     .target(LatLng(20.0, 10.0))
                                     .zoom(1.0)
                                     .build()
 
-                                val satelliteStyle = """
+                                // Satellite map using ESRI World Imagery (free, no API key)
+                                val satelliteMapStyle = """
                                 {
                                   "version": 8,
+                                  "name": "Satellite",
                                   "sources": {
                                     "esri-satellite": {
                                       "type": "raster",
-                                      "tiles": ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"],
-                                      "tileSize": 256
+                                      "tiles": [
+                                        "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+                                      ],
+                                      "tileSize": 256,
+                                      "attribution": "© Esri, Maxar, Earthstar Geographics, and the GIS User Community"
                                     }
                                   },
-                                  "layers": [{ "id": "satellite", "type": "raster", "source": "esri-satellite" }]
+                                  "layers": [
+                                    {
+                                      "id": "satellite-layer",
+                                      "type": "raster",
+                                      "source": "esri-satellite"
+                                    }
+                                  ]
                                 }
                                 """.trimIndent()
 
-                                map.setStyle(Style.Builder().fromJson(satelliteStyle)) { style ->
-                                    val features = displayLocations
+                                map.setStyle(Style.Builder().fromJson(satelliteMapStyle)) { style ->
+                                    val features = locations
                                         .filter { it.latitude != null && it.longitude != null }
                                         .mapIndexed { idx, loc ->
                                             val props = JsonObject().apply {
@@ -393,11 +398,11 @@ fun ThreatRadarMapCard(locations: List<ThreatLocation>) {
                                         val features = map.queryRenderedFeatures(screenPoint, "threats-dot")
                                         if (features.isNotEmpty()) {
                                             val idx = features[0].getNumberProperty("index")?.toInt() ?: 0
-                                            if (idx < displayLocations.size) {
-                                                selectedThreat = displayLocations[idx]
+                                            if (idx < locations.size) {
+                                                selectedThreat = locations[idx]
                                                 map.animateCamera(
                                                     CameraUpdateFactory.newLatLngZoom(
-                                                        LatLng(displayLocations[idx].latitude!!, displayLocations[idx].longitude!!),
+                                                        LatLng(locations[idx].latitude!!, locations[idx].longitude!!),
                                                         4.0
                                                     )
                                                 )
@@ -437,23 +442,25 @@ fun ThreatRadarMapCard(locations: List<ThreatLocation>) {
                     }
                 }
 
-                // Status badge — top left
-                Row(
-                    modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .padding(8.dp)
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(Color(0x0D, 0x14, 0x26).copy(alpha = 0.8f))
-                        .padding(horizontal = 8.dp, vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(modifier = Modifier.size(7.dp).background(Color(0x00, 0xFF, 0x88), CircleShape))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = if (locations.isNotEmpty()) "LIVE: ${locations.size} SITES" else "DEMO MODE",
-                        color = if (locations.isNotEmpty()) Color(0x00, 0xFF, 0x88) else Color(0x55, 0x55, 0x55),
-                        fontSize = 9.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace
-                    )
+                // Status badge — top left (only when there is real data)
+                if (hasRealData) {
+                    Row(
+                        modifier = Modifier
+                            .align(Alignment.TopStart)
+                            .padding(8.dp)
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(Color(0x0D, 0x14, 0x26).copy(alpha = 0.8f))
+                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(modifier = Modifier.size(7.dp).background(Color(0x00, 0xFF, 0x88), CircleShape))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "LIVE: ${locations.size} SITES",
+                            color = Color(0x00, 0xFF, 0x88),
+                            fontSize = 9.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace
+                        )
+                    }
                 }
             }
         }

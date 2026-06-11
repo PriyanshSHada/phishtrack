@@ -125,6 +125,46 @@ fun ReportScreen(
         },
         containerColor = Color(0x0A, 0x0E, 0x1A)
     ) { paddingValues ->
+        // Delete confirmation dialog
+        if (showDeleteDialog) {
+            AlertDialog(
+                onDismissRequest = { showDeleteDialog = false },
+                title = { Text("Delete Case", color = Color.White) },
+                text = { Text("Permanently delete this case and all its analysis data?", color = Color(0x88, 0x92, 0xB0)) },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            showDeleteDialog = false
+                            coroutineScope.launch {
+                                try {
+                                    casesRepository.deleteCase(caseId).collect { result ->
+                                        result.fold(
+                                            onSuccess = {
+                                                Toast.makeText(context, "Case deleted", Toast.LENGTH_SHORT).show()
+                                                onBackClick()
+                                            },
+                                            onFailure = { err ->
+                                                Toast.makeText(context, "Delete failed: ${err.message}", Toast.LENGTH_SHORT).show()
+                                            }
+                                        )
+                                    }
+                                } catch (e: Exception) {
+                                    Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF, 0x3B, 0x3B))
+                    ) { Text("DELETE", color = Color.White) }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showDeleteDialog = false }) {
+                        Text("Cancel", color = Color(0x88, 0x92, 0xB0))
+                    }
+                },
+                containerColor = Color(0x14, 0x18, 0x29)
+            )
+        }
+
         when (caseDetailState) {
             is UiState.Success -> {
                 val detail = (caseDetailState as UiState.Success).data
