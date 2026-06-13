@@ -99,6 +99,10 @@ exports.updateCase = async (req, res, next) => {
     const { id } = req.params;
     const { status, priority, description } = req.body;
 
+    // Verify case exists before attempting update
+    const existing = await prisma.case.findUnique({ where: { id } });
+    if (!existing) return res.status(404).json({ error: 'Not found' });
+
     const validStatuses = ['Open', 'Investigating', 'Closed', 'False_Positive'];
     const validPriorities = ['Low', 'Medium', 'High', 'Critical'];
     const data = {};
@@ -136,6 +140,10 @@ exports.updateCase = async (req, res, next) => {
 exports.deleteCase = async (req, res, next) => {
   try {
     const { id } = req.params;
+
+    // Verify case exists before attempting deletion
+    const existing = await prisma.case.findUnique({ where: { id } });
+    if (!existing) return res.status(404).json({ error: 'Not found' });
 
     // Delete child records first (foreign key constraints)
     await prisma.analysis.deleteMany({ where: { caseId: id } });

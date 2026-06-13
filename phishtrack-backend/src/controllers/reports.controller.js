@@ -297,17 +297,20 @@ exports.verifyReport = async (req, res, next) => {
       });
       
       // Log tampering to audit logs
-      await prisma.auditLog.create({
-        data: {
-          userId: req.user.userId,
-          caseId: report.caseId,
-          action: 'REPORT_TAMPERED_DETECTED',
-          metadata: {
-            reportId: report.id,
-            reason: !isValidHmac ? 'HMAC_MISMATCH' : (!fileExists ? 'FILE_MISSING' : 'HASH_MISMATCH')
+      const auditUserId = req.user?.userId || generatedById;
+      if (auditUserId) {
+        await prisma.auditLog.create({
+          data: {
+            userId: auditUserId,
+            caseId: report.caseId,
+            action: 'REPORT_TAMPERED_DETECTED',
+            metadata: {
+              reportId: report.id,
+              reason: !isValidHmac ? 'HMAC_MISMATCH' : (!fileExists ? 'FILE_MISSING' : 'HASH_MISMATCH')
+            }
           }
-        }
-      });
+        });
+      }
     }
 
     res.json({

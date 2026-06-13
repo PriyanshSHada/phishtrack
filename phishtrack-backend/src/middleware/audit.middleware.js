@@ -17,6 +17,12 @@ module.exports = (actionOverride) => {
             caseId = null;
           }
 
+          // For DELETE operations on cases, the case has already been deleted by the handler.
+          // The foreign key would fail if we try to log with the now-deleted caseId. Set it to null.
+          if (caseId && req.method === 'DELETE' && req.originalUrl.startsWith('/api/cases')) {
+            caseId = null;
+          }
+
           let action = actionOverride || `${req.method} ${req.originalUrl}`;
           
           // Beautify actions based on path
