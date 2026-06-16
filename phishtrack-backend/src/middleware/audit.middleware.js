@@ -4,7 +4,7 @@ module.exports = (actionOverride) => {
   return async (req, res, next) => {
     res.on('finish', async () => {
       try {
-        const isMutation = ['POST', 'PUT', 'DELETE'].includes(req.method);
+        const isMutation = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method);
         const isAuth = req.originalUrl.includes('/api/auth');
         
         if (isMutation || isAuth) {

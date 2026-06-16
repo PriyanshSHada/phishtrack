@@ -21,7 +21,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.gestures.animateScrollBy
 import com.example.phishtrack.data.api.CaseResponse
 import com.example.phishtrack.data.repository.CasesRepository
 import com.example.phishtrack.ui.dashboard.CaseItemCard

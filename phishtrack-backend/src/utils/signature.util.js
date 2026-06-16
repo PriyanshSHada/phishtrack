@@ -9,5 +9,10 @@ exports.sign = (payload) => {
 
 exports.verify = (payload, signature) => {
   const expected = exports.sign(payload);
-  return expected === signature;
+  // Use timingSafeEqual to prevent timing-based side-channel attacks
+  try {
+    return crypto.timingSafeEqual(Buffer.from(expected, 'hex'), Buffer.from(signature, 'hex'));
+  } catch {
+    return false;
+  }
 };

@@ -53,6 +53,9 @@ Redirect Chain: ${JSON.stringify(analysisData.redirectChain)}`
 
     const data = await response.json();
     const content = data.choices?.[0]?.message?.content;
+    if (!content) {
+      throw new Error('OpenAI returned an empty or null response content');
+    }
     const parsed = JSON.parse(content);
 
     return {

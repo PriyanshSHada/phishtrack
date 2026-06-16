@@ -4,6 +4,7 @@ import com.example.phishtrack.data.api.*
 import com.example.phishtrack.data.local.CaseDao
 import com.example.phishtrack.data.local.entities.CaseEntity
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
@@ -70,8 +71,8 @@ class CasesRepository @Inject constructor(
             val response = apiService.getCases(status, priority, date, 1, 1)
             response.pagination.total
         } catch (e: Exception) {
-            caseDao.getAllCasesFlow().collect { list -> return@getCasesCount list.size }
-            0
+            val cached = caseDao.getAllCasesFlow().firstOrNull()
+            cached?.size ?: 0
         }
     }
 

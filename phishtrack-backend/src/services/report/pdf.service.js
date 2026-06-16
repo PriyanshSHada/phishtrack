@@ -66,6 +66,7 @@ exports.generatePdfReport = (outputPath, data) => {
 
       // Severity badge on cover
       doc.rect(410, 30, 140, 50).fill(severityColor).opacity(0.12);
+      doc.opacity(1); // Reset opacity so subsequent content is not dimmed
       doc.rect(410, 30, 140, 50).stroke(severityColor).lineWidth(1.5);
       doc.fillColor(severityColor)
          .font('Helvetica-Bold')
@@ -298,8 +299,13 @@ exports.generatePdfReport = (outputPath, data) => {
         try {
           const base64Data = screenshot.replace(/^data:image\/\w+;base64,/, '');
           const buffer = Buffer.from(base64Data, 'base64');
-          // Size to fit on remaining page space
-          const availableHeight = Math.min(350, 800 - artY - 50);
+          // Guard against negative height when artY has grown large
+          const availableHeight = Math.max(50, Math.min(350, 800 - artY - 50));
+          if (artY + availableHeight > 800) {
+            // Not enough space — add a new page for the screenshot
+            doc.addPage();
+            artY = 50;
+          }
           doc.image(buffer, 50, artY, {
             fit: [495, availableHeight],
             align: 'center',

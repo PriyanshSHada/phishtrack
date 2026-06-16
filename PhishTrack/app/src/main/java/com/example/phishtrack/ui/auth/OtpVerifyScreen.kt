@@ -32,14 +32,16 @@ fun OtpVerifyScreen(
 ) {
     var otpCode by remember { mutableStateOf("") }
     var timeLeft by remember { mutableIntStateOf(60) }
+    var resendCount by remember { mutableIntStateOf(0) }
     
     val context = LocalContext.current
     val otpVerifyState by viewModel.otpVerifyState
     val resendOtpState by viewModel.resendOtpState
 
-    // Count-down timer
-    LaunchedEffect(timeLeft) {
-        if (timeLeft > 0) {
+    // Count-down timer — single coroutine, not one per tick
+    // resendCount is used as key so the countdown restarts after each OTP resend
+    LaunchedEffect(resendCount) {
+        while (timeLeft > 0) {
             delay(1000)
             timeLeft--
         }
@@ -185,6 +187,7 @@ fun OtpVerifyScreen(
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.clickable {
                         timeLeft = 60
+                        resendCount++
                         viewModel.resendOtp(email)
                     }
                 )

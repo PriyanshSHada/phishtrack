@@ -269,7 +269,7 @@ fun NewCaseScreen(
                 onClick = {
                     if (isValidUrl && !isSubmitting) {
                         isSubmitting = true
-                        val tagsList = if (tagsInput.trim().isEmpty()) emptyList() else tagsInput.split(",").map { it.trim() }
+                        val tagsList = if (tagsInput.trim().isEmpty()) emptyList() else tagsInput.split(",").map { it.trim() }.filter { it.isNotEmpty() }
                         onSubmitCase(url.trim(), description.trim().ifEmpty { null }, selectedSource, selectedPriority, tagsList)
                     }
                 },

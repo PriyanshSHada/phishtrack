@@ -297,7 +297,7 @@ exports.verifyReport = async (req, res, next) => {
       });
       
       // Log tampering to audit logs
-      const auditUserId = req.user?.userId || generatedById;
+      const auditUserId = req.user?.userId || report.generatedById;
       if (auditUserId) {
         await prisma.auditLog.create({
           data: {

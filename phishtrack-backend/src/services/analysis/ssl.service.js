@@ -10,13 +10,14 @@ function getSslDetails(hostname) {
       }
       resolve(cert);
     });
-    socket.on('error', (err) => {
-      resolve({ valid: false, error: err.message });
-    });
+    // Set timeout before the connection completes so it guards against hung connects
     socket.setTimeout(5000);
     socket.on('timeout', () => {
       socket.destroy();
       resolve({ valid: false, error: 'Connection timed out' });
+    });
+    socket.on('error', (err) => {
+      resolve({ valid: false, error: err.message });
     });
   });
 }
