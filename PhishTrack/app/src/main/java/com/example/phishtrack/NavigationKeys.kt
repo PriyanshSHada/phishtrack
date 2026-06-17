@@ -13,3 +13,4 @@ import kotlinx.serialization.Serializable
 @Serializable data class Report(val caseId: String) : NavKey
 @Serializable data object SecurityCheck : NavKey
 @Serializable data class CaseDetail(val caseId: String) : NavKey
+@Serializable data class UpdateRequired(val updateUrl: String) : NavKey

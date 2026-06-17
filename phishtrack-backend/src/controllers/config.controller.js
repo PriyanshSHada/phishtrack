@@ -4,8 +4,9 @@ exports.getVersion = async (req, res, next) => {
     // or environment variables. For now, we return a hardcoded minimum 
     // version required by the app to function properly.
     res.json({
-      minVersion: "1.0.0",
-      latestVersion: "1.0.0"
+      minimumRequiredVersion: 1,
+      latestVersion: 1,
+      updateUrl: "https://github.com/PriyanshSHada/phishtrack/releases"
     });
   } catch (err) {
     next(err);

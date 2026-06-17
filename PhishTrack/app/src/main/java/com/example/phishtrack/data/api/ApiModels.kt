@@ -233,6 +233,7 @@ data class ChainOfCustodyResponse(
 
 // --- Config ---
 data class VersionResponse(
-    val minVersion: String,
-    val latestVersion: String
+    val minimumRequiredVersion: Int,
+    val latestVersion: Int,
+    val updateUrl: String
 )

@@ -20,6 +20,7 @@ import com.example.phishtrack.ui.main.MainScreen
 import com.example.phishtrack.ui.newcase.NewCaseScreen
 import com.example.phishtrack.ui.report.ReportScreen
 import com.example.phishtrack.ui.splash.SplashScreen
+import com.example.phishtrack.ui.update.UpdateRequiredScreen
 import com.example.phishtrack.utils.TokenManager
 import kotlinx.coroutines.launch
 
@@ -40,14 +41,22 @@ fun MainNavigation(
         Splash -> {
           SplashScreen(
               tokenManager = tokenManager,
+              authRepository = authRepository,
               onNavigateNext = { isLoggedIn ->
                   if (isLoggedIn) {
                       backStack.replaceTop(SecurityCheck)
                   } else {
                       backStack.replaceTop(Login)
                   }
+              },
+              onUpdateRequired = { updateUrl ->
+                  backStack.replaceTop(UpdateRequired(updateUrl))
               }
           )
+        }
+
+        is UpdateRequired -> {
+            UpdateRequiredScreen(updateUrl = destination.updateUrl)
         }
 
         Login -> {

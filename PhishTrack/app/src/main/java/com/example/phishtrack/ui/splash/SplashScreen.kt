@@ -22,13 +22,18 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.phishtrack.BuildConfig
+import com.example.phishtrack.data.repository.AuthRepository
 import com.example.phishtrack.utils.TokenManager
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 
 @Composable
 fun SplashScreen(
     tokenManager: TokenManager,
-    onNavigateNext: (isLoggedIn: Boolean) -> Unit
+    authRepository: AuthRepository,
+    onNavigateNext: (isLoggedIn: Boolean) -> Unit,
+    onUpdateRequired: (updateUrl: String) -> Unit
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "shield_pulse")
     val pulse by infiniteTransition.animateFloat(
@@ -42,7 +47,20 @@ fun SplashScreen(
     )
 
     LaunchedEffect(Unit) {
-        delay(2500)
+        try {
+            val minVersionResult = authRepository.checkVersion().first()
+            if (minVersionResult.isSuccess) {
+                val config = minVersionResult.getOrNull()
+                if (config != null && BuildConfig.VERSION_CODE < config.minimumRequiredVersion) {
+                    onUpdateRequired(config.updateUrl)
+                    return@LaunchedEffect
+                }
+            }
+        } catch (e: Exception) {
+            // Ignore network errors on splash to allow offline fallback
+        }
+
+        delay(2000)
         val token = tokenManager.getToken()
         onNavigateNext(!token.isNullOrEmpty())
     }
