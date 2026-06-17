@@ -33,7 +33,10 @@ if (missing.length) {
 }
 
 const app = express();
-app.use(cors());
+const corsOptions = {
+  origin: process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : '*'
+};
+app.use(cors(corsOptions));
 app.use(express.json());
 
 // Apply Global Rate Limiting (100 req per 15 mins)

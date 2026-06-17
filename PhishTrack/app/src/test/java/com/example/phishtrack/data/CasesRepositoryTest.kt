@@ -12,6 +12,8 @@ import org.junit.Before
 import org.junit.Test
 
 import com.example.phishtrack.data.local.DashboardDao
+import com.example.phishtrack.data.local.entities.DashboardCacheEntity
+import com.google.gson.Gson
 
 /**
  * Unit tests for [CasesRepository] — covers refresh, create, update, delete, and tags round-trip.
@@ -189,5 +191,45 @@ class CasesRepositoryTest {
             assertTrue(cases.first().tags.isEmpty())
             cancelAndIgnoreRemainingEvents()
         }
+    }
+
+    // ── Dashboard Caching ─────────────────────────────────────────────────────
+
+    @Test
+    fun `A34 - getStats successful network fetch populates DashboardDao`() = runTest {
+        val response = StatsResponse(users = 10, cases = 20, analyses = 30, reports = 40)
+        coEvery { dashboardDao.getCacheById("stats") } returns null
+        coEvery { apiService.getDashboardStats() } returns response
+
+        repo.getStats().test {
+            val result = awaitItem()
+            assertTrue(result.isSuccess)
+            assertEquals(10, result.getOrNull()?.users)
+            awaitComplete()
+        }
+
+        coVerify(exactly = 1) { dashboardDao.insertCache(match { it.id == "stats" }) }
+    }
+
+    @Test
+    fun `A35 - getStats network failure gracefully falls back to DashboardDao cache`() = runTest {
+        val cachedResponse = StatsResponse(users = 5, cases = 5, analyses = 5, reports = 5)
+        val cacheEntity = DashboardCacheEntity("stats", Gson().toJson(cachedResponse), 0L)
+        
+        coEvery { dashboardDao.getCacheById("stats") } returns cacheEntity
+        coEvery { apiService.getDashboardStats() } throws RuntimeException("Network Offline")
+
+        repo.getStats().test {
+            // First emission is from cache
+            val firstEmission = awaitItem()
+            assertTrue(firstEmission.isSuccess)
+            assertEquals(5, firstEmission.getOrNull()?.users)
+            
+            // Should not emit failure since we already had cache
+            awaitComplete()
+        }
+        
+        // Ensure no new cache was inserted due to failure
+        coVerify(exactly = 0) { dashboardDao.insertCache(any()) }
     }
 }
