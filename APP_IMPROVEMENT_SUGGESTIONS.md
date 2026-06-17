@@ -358,11 +358,11 @@ If the backend API changes (e.g., new status values, renamed fields), older app 
 ### Short Term (1-2 Weeks)
 | # | Action | Impact |
 |---|--------|--------|
-| 6 | Add pagination to cases endpoint | Prevents performance degradation |
-| 7 | Add per-route rate limiting on auth endpoints | Prevents brute-force attacks |
-| 8 | Add input validation with zod/express-validator | Prevents injection attacks |
-| 9 | Force PIN change on first login (remove "1234" default) | Improves security |
-| 10 | Add pull-to-refresh to cases list | Improves UX |
+| 6 | ~Add pagination to cases endpoint~ (Completed) | Prevents performance degradation |
+| 7 | ~Add per-route rate limiting on auth endpoints~ (Completed) | Prevents brute-force attacks |
+| 8 | ~Add input validation with zod/express-validator~ (Completed) | Prevents injection attacks |
+| 9 | ~Force PIN change on first login (remove "1234" default)~ (Completed) | Improves security |
+| 10 | ~Add pull-to-refresh to cases list~ (Completed) | Improves UX |
 
 ### Medium Term (1 Month)
 | # | Action | Impact |

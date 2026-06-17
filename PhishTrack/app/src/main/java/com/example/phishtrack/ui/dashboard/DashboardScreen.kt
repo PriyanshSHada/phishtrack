@@ -59,6 +59,7 @@ import com.example.phishtrack.data.api.StatsResponse
 import com.example.phishtrack.data.api.ThreatLocation
 import com.example.phishtrack.data.api.WeeklyGraphData
 import com.example.phishtrack.ui.auth.UiState
+import com.example.phishtrack.ui.theme.shimmerEffect
 
 @Composable
 fun DashboardScreen(
@@ -254,6 +255,7 @@ fun MetricsGridPlaceholder() {
                     .height(70.dp)
                     .background(Color(0x14, 0x18, 0x29), RoundedCornerShape(8.dp))
                     .border(1.dp, Color(0x2A, 0x35, 0x58).copy(alpha = 0.3f), RoundedCornerShape(8.dp))
+                    .shimmerEffect()
             )
         }
     }
@@ -263,8 +265,14 @@ fun MetricsGridPlaceholder() {
 fun MetricCard(title: String, value: String, color: Color, modifier: Modifier = Modifier) {
     Card(
         shape = RoundedCornerShape(8.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0x14, 0x18, 0x29)), // Glassmorphism
+        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
         modifier = modifier
+            .background(
+                brush = Brush.linearGradient(
+                    colors = listOf(Color(0x1A, 0xFF, 0xFF, 0xFF), Color(0x05, 0xFF, 0xFF, 0xFF))
+                ),
+                shape = RoundedCornerShape(8.dp)
+            )
             .border(1.dp, Color(0x2A, 0x35, 0x58), RoundedCornerShape(8.dp))
     ) {
         Column(

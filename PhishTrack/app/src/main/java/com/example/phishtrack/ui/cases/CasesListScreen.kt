@@ -29,6 +29,7 @@ import com.example.phishtrack.ui.dashboard.EmptyCasesPlaceholder
 import kotlinx.coroutines.launch
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
+import com.example.phishtrack.ui.theme.shimmerEffect
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -235,6 +236,18 @@ fun CasesListScreen(
                     }
                 }
             }
+        } else if (filteredCases.isEmpty() && isRefreshing) {
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxSize()) {
+                items(5) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(110.dp)
+                            .background(Color(0x14, 0x18, 0x29), RoundedCornerShape(10.dp))
+                            .shimmerEffect()
+                    )
+                }
+            }
         } else if (filteredCases.isEmpty()) {
             Box(
                 modifier = Modifier.fillMaxWidth().height(100.dp)
@@ -255,8 +268,13 @@ fun CasesListScreen(
                 modifier = Modifier.fillMaxSize()
             ) {
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxSize()) {
-                    items(filteredCases) { case ->
-                        CaseItemCard(case = case, onClick = { onCaseClick(case.id) })
+                    items(filteredCases, key = { it.id }) { case ->
+                        androidx.compose.animation.AnimatedVisibility(
+                            visible = true,
+                            enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.slideInVertically(initialOffsetY = { 50 }),
+                        ) {
+                            CaseItemCard(case = case, onClick = { onCaseClick(case.id) })
+                        }
                     }
                 }
             }

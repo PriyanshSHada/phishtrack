@@ -71,7 +71,9 @@ fun SecurityCheckScreen(
     }
 
     LaunchedEffect(Unit) {
-        if (!isBiometricEnabled && !isPinEnabled) {
+        if (savedPin == null) {
+            // Force setup, do nothing
+        } else if (!isBiometricEnabled && !isPinEnabled) {
             onSuccess() // No security enabled, pass through
         } else if (isBiometricEnabled && !hasPromptedBiometric) {
             hasPromptedBiometric = true
@@ -114,7 +116,61 @@ fun SecurityCheckScreen(
 
         Spacer(modifier = Modifier.height(48.dp))
 
-        if (isPinEnabled) {
+        if (savedPin == null) {
+            // --- ENFORCE PIN SETUP ON FIRST LOGIN ---
+            Text(
+                text = "Set Up Your Security PIN",
+                color = Color.White,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "Enter a 4-digit PIN to protect your account.",
+                color = Color(0x88, 0x92, 0xB0),
+                fontSize = 13.sp
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+
+            OutlinedTextField(
+                value = pinInput,
+                onValueChange = { value ->
+                    if (value.length <= 4 && value.all { it.isDigit() }) {
+                        pinInput = value
+                    }
+                },
+                label = { Text("Create 4-digit PIN", color = Color(0x88, 0x92, 0xB0)) },
+                visualTransformation = PasswordVisualTransformation(),
+                singleLine = true,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = Color(0x00, 0xF5, 0xFF),
+                    unfocusedBorderColor = Color(0x2A, 0x35, 0x58),
+                    focusedTextColor = Color.White,
+                    unfocusedTextColor = Color.White
+                ),
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            Button(
+                onClick = {
+                    if (pinInput.length == 4) {
+                        authRepository.setPin(pinInput)
+                        authRepository.setPinLockEnabled(true)
+                        onSuccess()
+                    } else {
+                        errorMessage = "PIN must be exactly 4 digits"
+                    }
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0x00, 0xF5, 0xFF)),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Save PIN & Continue", color = Color(0x0A, 0x0E, 0x1A), fontWeight = FontWeight.Bold)
+            }
+        } else {
+            // --- STANDARD UNLOCK ---
+            if (isPinEnabled || savedPin != null) {
             OutlinedTextField(
                 value = pinInput,
                 onValueChange = { value ->
@@ -167,5 +223,6 @@ fun SecurityCheckScreen(
         TextButton(onClick = onLogout) {
             Text("Logout & Clear Data", color = Color(0xFF, 0x55, 0x55))
         }
+        } // End of else block
     }
 }
