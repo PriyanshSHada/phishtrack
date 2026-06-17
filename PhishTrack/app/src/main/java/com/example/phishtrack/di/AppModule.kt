@@ -13,6 +13,8 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
@@ -60,10 +62,13 @@ object AppModule {
                     response.close() // Avoid resource leak
                     
                     // Make synchronous request to /auth/refresh
+                    val jsonMediaType = "application/json; charset=utf-8".toMediaTypeOrNull()
+                    val jsonBody = "{\"refreshToken\":\"$refreshToken\"}"
+                    val refreshRequestBody = jsonBody.toRequestBody(jsonMediaType)
+                    
                     val refreshRequest = okhttp3.Request.Builder()
                         .url("${BASE_URL}auth/refresh")
-                        .post(okhttp3.RequestBody.create(null, ByteArray(0)))
-                        .addHeader("Authorization", "Bearer $refreshToken")
+                        .post(refreshRequestBody)
                         .build()
                         
                     val tempClient = OkHttpClient()

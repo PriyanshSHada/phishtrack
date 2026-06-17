@@ -1,4 +1,5 @@
 const redisClient = require('../redisClient');
+const logger = require('../utils/logger');
 
 module.exports = (options = {}) => {
   const windowMs = options.windowMs || 15 * 60 * 1000; // Default 15 minutes
@@ -39,8 +40,8 @@ module.exports = (options = {}) => {
 
       next();
     } catch (err) {
-      console.error('Rate limiting middleware error:', err);
-      next(); // Fail-open on error
+      logger.error('Rate limiting middleware error', { error: err.message, stack: err.stack });
+      next(); // Fail open if Redis is down so users can still login
     }
   };
 };

@@ -1,7 +1,8 @@
 exports.getVirusTotalResult = async (urlStr) => {
+  const logger = require('../../utils/logger');
   const apiKey = process.env.VIRUSTOTAL_API_KEY;
   if (!apiKey) {
-    console.warn('VirusTotal API Key not configured');
+    logger.warn('VirusTotal API Key not configured');
     return { error: 'VirusTotal API key not configured' };
   }
 
@@ -77,7 +78,7 @@ exports.getVirusTotalResult = async (urlStr) => {
       detections
     };
   } catch (err) {
-    console.error('VirusTotal API Error:', err);
+    logger.error('VirusTotal API Error', { error: err.message, stack: err.stack, url: urlStr });
     return { error: err.message || 'VirusTotal check failed' };
   }
 };

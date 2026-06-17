@@ -1,5 +1,6 @@
 const puppeteer = require('puppeteer-core');
 const crypto = require('crypto');
+const logger = require('../../utils/logger');
 const os = require('os');
 
 function getBrowserExecutablePath() {
@@ -57,8 +58,11 @@ exports.runSandbox = async (url) => {
       redirectChain
     };
   } catch (err) {
-    console.error('Puppeteer Sandbox Error:', err);
-    throw err;
+    logger.error('Puppeteer Sandbox Error', { error: err.message, stack: err.stack, url: url });
+    return {
+      error: 'Failed to analyze page',
+      details: err.message
+    };
   } finally {
     if (browser) {
       await browser.close();

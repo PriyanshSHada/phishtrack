@@ -9,6 +9,8 @@ const brands = [
   'reddit.com', 'wikipedia.org', 'outlook.com', 'live.com', 'office.com'
 ];
 
+const logger = require('../../utils/logger');
+
 function levenshteinDistance(s1, s2) {
   const m = s1.length;
   const n = s2.length;
@@ -70,7 +72,7 @@ exports.checkSimilarity = (urlStr) => {
 
     return { isBrandDomain: false, similarTo: null, distance: minDistance };
   } catch (err) {
-    console.error('Similarity check error:', err);
+    logger.error('Similarity check error', { error: err.message, stack: err.stack, url: urlStr });
     return { isBrandDomain: false, similarTo: null, error: err.message };
   }
 };

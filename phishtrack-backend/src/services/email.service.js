@@ -1,13 +1,14 @@
 /**
  * Email Service using Brevo (Sendinblue) API
  */
+const logger = require('../utils/logger');
 
 exports.sendOtp = async (to, otp) => {
   const brevoApiKey = process.env.BREVO_API_KEY;
   const senderEmail = process.env.BREVO_SENDER_EMAIL || 'phishtrackoffical@gmail.com';
 
   if (!brevoApiKey) {
-    console.warn(`[email stub] To: ${to} OTP: ${otp} (Brevo API Key not configured)`);
+    logger.warn(`[email stub] To: ${to} OTP: ${otp} (Brevo API Key not configured)`);
     return;
   }
 
@@ -40,13 +41,13 @@ exports.sendOtp = async (to, otp) => {
 
     if (!response.ok) {
       const errorData = await response.text();
-      console.error('Brevo API Error:', response.status, errorData);
+      logger.error('Brevo API Error', { status: response.status, data: errorData });
       // We don't throw an error here, so the login request doesn't crash 
       // but developers can see the API key is wrong in the logs
     } else {
-      console.log(`[Brevo] OTP email successfully sent to ${to}`);
+      logger.info(`[Brevo] OTP email successfully sent to ${to}`);
     }
   } catch (error) {
-    console.error('Error sending email via Brevo:', error);
+    logger.error('Error sending email via Brevo', { error: error.message, stack: error.stack });
   }
 };

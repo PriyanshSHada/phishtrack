@@ -6,6 +6,7 @@ const virustotalService = require('../services/analysis/virustotal.service');
 const domainCheckService = require('../services/analysis/domainCheck.service');
 const puppeteerService = require('../services/sandbox/puppeteer.service');
 const openaiService = require('../services/ai/openai.service');
+const logger = require('../utils/logger');
 
 exports.runAnalysis = async (req, res, next) => {
   try {
@@ -103,7 +104,7 @@ exports.runAnalysis = async (req, res, next) => {
 
     res.status(201).json(analysis);
   } catch (err) {
-    console.error('Analysis Engine Error:', err);
+    logger.error('Analysis Engine Error', { error: err.message, stack: err.stack, caseId: req.body.caseId });
     next(err);
   }
 };

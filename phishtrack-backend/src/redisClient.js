@@ -1,8 +1,9 @@
 const { createClient } = require('redis');
+const logger = require('./utils/logger');
 
 const redisUrl = process.env.REDIS_URL;
 if (!redisUrl) {
-  console.warn('Warning: REDIS_URL environment variable is not defined.');
+  logger.warn('Warning: REDIS_URL environment variable is not defined.');
 }
 
 const redisClient = createClient({
@@ -10,7 +11,7 @@ const redisClient = createClient({
 });
 
 redisClient.on('error', (err) => {
-  console.error('Redis Client Error:', err);
+  logger.error('Redis Client Error', { error: err.message, stack: err.stack });
 });
 
 module.exports = redisClient;

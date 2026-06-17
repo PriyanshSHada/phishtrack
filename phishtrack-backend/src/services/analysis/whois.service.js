@@ -1,4 +1,5 @@
 const whois = require('whois');
+const logger = require('../../utils/logger');
 
 function lookupWhois(domain) {
   return new Promise((resolve, reject) => {
@@ -46,7 +47,7 @@ exports.getWhoisData = async (urlStr) => {
       isSuspiciousAge
     };
   } catch (err) {
-    console.error('WHOIS Lookup Error:', err);
+    logger.error('WHOIS Lookup Error', { error: err.message, stack: err.stack, url: urlStr });
     return null; // Return null so analysis doesn't store an error object
   }
 };

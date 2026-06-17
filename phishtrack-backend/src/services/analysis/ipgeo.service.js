@@ -1,4 +1,5 @@
 const dns = require('dns').promises;
+const logger = require('../../utils/logger');
 
 exports.getIpGeoData = async (urlStr) => {
   try {
@@ -19,7 +20,7 @@ exports.getIpGeoData = async (urlStr) => {
 
     // ip-api.com sets status='fail' for private/reserved IPs and other errors
     if (data.status !== 'success') {
-      console.warn('IP Geo: ip-api returned non-success status for IP', ip, '-', data.message || 'unknown');
+      logger.warn('IP Geo: ip-api returned non-success status', { ip: ip, message: data.message || 'unknown' });
       return null;
     }
 
@@ -37,7 +38,7 @@ exports.getIpGeoData = async (urlStr) => {
       as: data.as || 'Unknown'
     };
   } catch (err) {
-    console.error('IP Geo Error:', err);
+    logger.error('IP Geo Error', { error: err.message, stack: err.stack, url: urlStr });
     return null; // Return null instead of error string so threat map doesn't crash on this record
   }
 };

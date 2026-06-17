@@ -1,4 +1,5 @@
 const tls = require('tls');
+const logger = require('../../utils/logger');
 
 function getSslDetails(hostname) {
   return new Promise((resolve, reject) => {
@@ -49,7 +50,7 @@ exports.getSslInfo = async (urlStr) => {
       serialNumber: cert.serialNumber
     };
   } catch (err) {
-    console.error('SSL Check Error:', err);
+    logger.error('SSL Check Error', { error: err.message, stack: err.stack, url: urlStr });
     return { valid: false, error: err.message || 'SSL verification failed' };
   }
 };

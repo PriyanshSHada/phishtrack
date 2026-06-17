@@ -6,6 +6,11 @@ jest.mock('../../../src/prismaClient', () => ({
   auditLog: { create: (...args) => mockCreate(...args) }
 }));
 
+const logger = require('../../../src/utils/logger');
+jest.mock('../../../src/utils/logger', () => ({
+  error: jest.fn()
+}));
+
 const auditMiddleware = require('../../../src/middleware/audit.middleware');
 
 /** Helper: builds req/res/next, invokes the middleware, and optionally fires 'finish' */
@@ -91,12 +96,10 @@ describe('audit.middleware', () => {
 
   test('U62 — Prisma write failure is caught; next() is NOT affected', async () => {
     mockCreate.mockRejectedValueOnce(new Error('DB error'));
-    const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     const { next, fireFinish } = setup({ method: 'POST', url: '/api/cases' });
 
     expect(next).toHaveBeenCalled(); // next() called synchronously before finish
     await fireFinish();
-    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Audit middleware'), expect.any(Error));
-    consoleSpy.mockRestore();
+    expect(logger.error).toHaveBeenCalledWith(expect.stringContaining('Audit middleware logging error'), expect.any(Object));
   });
 });

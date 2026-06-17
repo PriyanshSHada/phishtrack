@@ -3,6 +3,7 @@ const { hashPassword, comparePassword } = require('../utils/hash.util');
 const { signAccessToken, signRefreshToken, blacklistToken, verifyJwt } = require('../utils/jwt.util');
 const emailService = require('../services/email.service');
 const redisClient = require('../redisClient');
+const logger = require('../utils/logger');
 
 exports.register = async (req, res, next) => {
   try {
@@ -21,7 +22,7 @@ exports.register = async (req, res, next) => {
       analyst_id: user.analyst_id
     });
   } catch (err) {
-    console.error(err);
+    logger.error('Registration error', { error: err.message, stack: err.stack });
     next(err);
   }
 };
@@ -42,7 +43,7 @@ exports.login = async (req, res, next) => {
     if (redisClient.isOpen) {
       await redisClient.setEx(`otp:${email}`, 300, otp);
     } else {
-      console.error('Redis client is not open; unable to store OTP.');
+      logger.error('Redis client is not open; unable to store OTP.');
       throw new Error('Redis connection error');
     }
 
@@ -51,7 +52,7 @@ exports.login = async (req, res, next) => {
 
     res.json({ message: 'OTP sent to email', email: user.email });
   } catch (err) {
-    console.error(err);
+    logger.error('Login error', { error: err.message, stack: err.stack });
     next(err);
   }
 };
@@ -90,7 +91,7 @@ exports.verifyOtp = async (req, res, next) => {
     const refreshToken = signRefreshToken({ userId: user.id });
     res.json({ token, refreshToken, user: { id: user.id, email: user.email } });
   } catch (err) {
-    console.error(err);
+    logger.error('Verify OTP error', { error: err.message, stack: err.stack });
     next(err);
   }
 };
@@ -110,7 +111,7 @@ exports.me = async (req, res, next) => {
       role: user.role
     });
   } catch (err) {
-    console.error(err);
+    logger.error('Get profile error', { error: err.message, stack: err.stack });
     next(err);
   }
 };
@@ -130,7 +131,7 @@ exports.resendOtp = async (req, res, next) => {
     if (redisClient.isOpen) {
       await redisClient.setEx(`otp:${email}`, 300, otp);
     } else {
-      console.error('Redis client is not open; unable to store OTP.');
+      logger.error('Redis client is not open; unable to store OTP.');
       throw new Error('Redis connection error');
     }
 
@@ -139,7 +140,7 @@ exports.resendOtp = async (req, res, next) => {
 
     res.json({ message: 'OTP resent to email' });
   } catch (err) {
-    console.error(err);
+    logger.error('Resend OTP error', { error: err.message, stack: err.stack });
     next(err);
   }
 };

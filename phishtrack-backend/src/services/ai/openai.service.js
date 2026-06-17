@@ -1,7 +1,9 @@
+const logger = require('../../utils/logger');
+
 exports.analyzeWithAi = async (analysisData) => {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
-    console.warn('OpenAI API key not configured');
+    logger.warn('OpenAI API key not configured');
     return {
       threat_score: 50,
       severity: 'Medium',
@@ -66,7 +68,7 @@ Redirect Chain: ${JSON.stringify(analysisData.redirectChain)}`
       ai_summary: parsed.ai_summary || ''
     };
   } catch (err) {
-    console.error('OpenAI Analysis Error:', err);
+    logger.error('OpenAI Analysis Error', { error: err.message, stack: err.stack, data: analysisData });
     return {
       threat_score: 50,
       severity: 'Medium',

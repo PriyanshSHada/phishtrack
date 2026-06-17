@@ -1,4 +1,5 @@
 const prisma = require('../prismaClient');
+const logger = require('../utils/logger');
 
 module.exports = (actionOverride) => {
   return async (req, res, next) => {
@@ -68,7 +69,7 @@ module.exports = (actionOverride) => {
           });
         }
       } catch (err) {
-        console.error('Audit middleware logging error:', err);
+        logger.error('Audit middleware logging error', { error: err.message, stack: err.stack });
       }
     });
     next();

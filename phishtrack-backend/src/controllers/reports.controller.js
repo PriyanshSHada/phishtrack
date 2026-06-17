@@ -3,6 +3,7 @@ const { sign, verify } = require('../utils/signature.util');
 const pdfService = require('../services/report/pdf.service');
 const path = require('path');
 const fs = require('fs');
+const logger = require('../utils/logger');
 const crypto = require('crypto');
 const storageService = require('../services/storage.service');
 
@@ -154,7 +155,7 @@ exports.generateReport = async (req, res, next) => {
 
     res.status(201).json(report);
   } catch (err) {
-    console.error('Error generating report:', err);
+    logger.error('Error generating report', { error: err.message, stack: err.stack, caseId: req.params.caseId });
     next(err);
   }
 };
@@ -246,7 +247,7 @@ exports.downloadPdf = async (req, res, next) => {
     res.setHeader('Content-Disposition', `attachment; filename="PhishTrack_Report_Case_${report.caseId}_v${report.version}.pdf"`);
     const readStream = fs.createReadStream(filePath);
     readStream.on('error', (streamErr) => {
-      console.error('Error reading report file:', streamErr);
+      logger.error('Error reading report file', { error: streamErr.message, stack: streamErr.stack });
       if (!res.headersSent) {
         res.status(500).json({ error: 'Failed to read report file' });
       }
@@ -344,7 +345,7 @@ exports.verifyReport = async (req, res, next) => {
       }
     });
   } catch (err) {
-    console.error('Error verifying report:', err);
+    logger.error('Error verifying report', { error: err.message, stack: err.stack });
     next(err);
   }
 };
