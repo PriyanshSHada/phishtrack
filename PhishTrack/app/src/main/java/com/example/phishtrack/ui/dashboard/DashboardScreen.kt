@@ -206,6 +206,18 @@ fun DashboardScreen(
                         CircularProgressIndicator(color = Color(0x00, 0xF5, 0xFF))
                     }
                 }
+                is UiState.Error -> {
+                    val errorMsg = (recentCasesState as UiState.Error).message
+                    Box(modifier = Modifier.fillMaxWidth().height(100.dp).background(Color(0x14, 0x18, 0x29), RoundedCornerShape(8.dp)).border(1.dp, Color(0xFF, 0x3B, 0x3B).copy(alpha = 0.5f), RoundedCornerShape(8.dp)), contentAlignment = Alignment.Center) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+                            Text("Connection Error", color = Color(0xFF, 0x55, 0x55), fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Button(onClick = { viewModel.loadDashboardData() }, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF, 0x3B, 0x3B).copy(alpha = 0.2f)), modifier = Modifier.height(36.dp)) {
+                                Text("Retry", color = Color(0xFF, 0x55, 0x55), fontSize = 12.sp)
+                            }
+                        }
+                    }
+                }
                 else -> {
                     EmptyCasesPlaceholder()
                 }

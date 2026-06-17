@@ -230,3 +230,9 @@ data class ChainOfCustodyResponse(
     @SerializedName("hash_before") val hashBefore: String?,
     @SerializedName("hash_after") val hashAfter: String?
 )
+
+// --- Config ---
+data class VersionResponse(
+    val minVersion: String,
+    val latestVersion: String
+)

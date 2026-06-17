@@ -12,6 +12,15 @@ class AuthRepository @Inject constructor(
     private val apiService: ApiService,
     private val tokenManager: TokenManager
 ) {
+    fun checkVersion(): Flow<Result<VersionResponse>> = flow {
+        try {
+            val response = apiService.getVersion()
+            emit(Result.success(response))
+        } catch (e: Exception) {
+            emit(Result.failure(e))
+        }
+    }
+
     fun login(email: String, password: String): Flow<Result<LoginResponse>> = flow {
         try {
             val response = apiService.login(LoginRequest(email, password))

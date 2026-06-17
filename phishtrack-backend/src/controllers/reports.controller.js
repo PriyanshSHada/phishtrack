@@ -4,6 +4,7 @@ const pdfService = require('../services/report/pdf.service');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
+const storageService = require('../services/storage.service');
 
 // Helper function to calculate SHA-256 of a file
 function getFileHash(filePath) {
@@ -108,6 +109,9 @@ exports.generateReport = async (req, res, next) => {
     // Compute file hash after creation
     const hashAfter = await getFileHash(outputPath);
 
+    // Upload to Cloud Storage
+    const cloudUrl = await storageService.uploadReportPdf(reportId, outputPath);
+
     // Create Report in Database
     const report = await prisma.report.create({
       data: {
@@ -198,6 +202,15 @@ exports.downloadPdf = async (req, res, next) => {
     if (!report) {
       return res.status(404).json({ error: 'Report not found' });
     }
+
+    // Try cloud storage first
+    const cloudBuffer = await storageService.downloadReportPdf(id);
+    if (cloudBuffer) {
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="PhishTrack_Report_Case_${report.caseId}_v${report.version}.pdf"`);
+      return res.send(cloudBuffer);
+    }
+
     const filePath = path.join(__dirname, '../../uploads/reports', `${id}.pdf`);
 
     // If file doesn't exist (Render ephemeral disk), regenerate it

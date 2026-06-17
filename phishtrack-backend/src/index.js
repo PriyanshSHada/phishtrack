@@ -11,6 +11,7 @@ const dashboardRouter = require('./routes/dashboard.route');
 const reportsRouter = require('./routes/reports.route');
 const analysisRouter = require('./routes/analysis.route');
 const auditRouter = require('./routes/audit.route');
+const configRouter = require('./routes/config.route');
 const redisClient = require('./redisClient');
 const rateLimitMiddleware = require('./middleware/rateLimit.middleware');
 const auditMiddleware = require('./middleware/audit.middleware');
@@ -52,6 +53,7 @@ app.use('/api/dashboard', dashboardRouter);
 app.use('/api/reports', reportsRouter);
 app.use('/api/analysis', analysisRouter);
 app.use('/api/audit', auditRouter);
+app.use('/api/config', configRouter);
 
 // global error handler
 app.use((err, req, res, next) => {

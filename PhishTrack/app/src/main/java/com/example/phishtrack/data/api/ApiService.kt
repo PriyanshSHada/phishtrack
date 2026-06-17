@@ -4,6 +4,10 @@ import okhttp3.ResponseBody
 import retrofit2.http.*
 
 interface ApiService {
+  // --- Config ---
+  @GET("api/config/version")
+  suspend fun getVersion(): VersionResponse
+
   // --- Auth ---
   @POST("api/auth/register")
   suspend fun register(@Body req: RegisterRequest): RegisterResponse

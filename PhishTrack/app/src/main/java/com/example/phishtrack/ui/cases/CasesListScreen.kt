@@ -45,15 +45,21 @@ fun CasesListScreen(
     var sortBy by remember { mutableStateOf("Date") }
     var isRefreshing by remember { mutableStateOf(false) }
 
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+
     val casesList by casesRepository.cachedCasesFlow.collectAsState(initial = emptyList())
     val coroutineScope = rememberCoroutineScope()
 
     fun refresh() {
         coroutineScope.launch {
             isRefreshing = true
+            errorMessage = null
             val statusParam = if (selectedStatus == "All") null else selectedStatus
             val priorityParam = if (selectedPriority == "All") null else selectedPriority
-            casesRepository.refreshCases(statusParam, priorityParam, selectedDate)
+            val result = casesRepository.refreshCases(statusParam, priorityParam, selectedDate)
+            if (result.isFailure) {
+                errorMessage = result.exceptionOrNull()?.message ?: "Failed to load cases"
+            }
             isRefreshing = false
         }
     }
@@ -212,7 +218,24 @@ fun CasesListScreen(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        if (filteredCases.isEmpty()) {
+        if (errorMessage != null && filteredCases.isEmpty()) {
+            Box(
+                modifier = Modifier.fillMaxWidth().fillMaxHeight(0.5f)
+                    .background(Color(0x14, 0x18, 0x29), RoundedCornerShape(8.dp))
+                    .border(1.dp, Color(0xFF, 0x3B, 0x3B).copy(alpha = 0.5f), RoundedCornerShape(8.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+                    Text("Connection Error", color = Color(0xFF, 0x55, 0x55), fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(errorMessage ?: "Unknown error", color = Color(0x88, 0x92, 0xB0), fontSize = 13.sp)
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Button(onClick = { refresh() }, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF, 0x3B, 0x3B).copy(alpha = 0.2f))) {
+                        Text("Try Again", color = Color(0xFF, 0x55, 0x55))
+                    }
+                }
+            }
+        } else if (filteredCases.isEmpty()) {
             Box(
                 modifier = Modifier.fillMaxWidth().height(100.dp)
                     .background(Color(0x14, 0x18, 0x29), RoundedCornerShape(8.dp))
