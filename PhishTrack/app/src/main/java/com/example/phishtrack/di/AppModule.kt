@@ -48,12 +48,59 @@ object AppModule {
             chain.proceed(requestBuilder.build())
         }
 
-        // Auto-logout: clears the stored token whenever the server returns 401 Unauthorized.
-        // Since isLoggedIn() checks for a non-null token, the Navigation layer will redirect
-        // to Login automatically on the next app resume — no event bus needed.
+        // Auto-refresh token interceptor: intercept 401 Unauthorized responses, attempt to refresh
+        // the access token using the refresh token, and retry the original request.
         val unauthorizedInterceptor = Interceptor { chain ->
-            val response = chain.proceed(chain.request())
-            if (response.code == 401) {
+            val request = chain.request()
+            val response = chain.proceed(request)
+            
+            if (response.code == 401 && !request.url.encodedPath.contains("auth/refresh")) {
+                val refreshToken = tokenManager.getRefreshToken()
+                if (refreshToken != null) {
+                    response.close() // Avoid resource leak
+                    
+                    // Make synchronous request to /auth/refresh
+                    val refreshRequest = okhttp3.Request.Builder()
+                        .url("${BASE_URL}auth/refresh")
+                        .post(okhttp3.RequestBody.create(null, ByteArray(0)))
+                        .addHeader("Authorization", "Bearer $refreshToken")
+                        .build()
+                        
+                    val tempClient = OkHttpClient()
+                    val refreshResponse = try {
+                        tempClient.newCall(refreshRequest).execute()
+                    } catch (e: Exception) {
+                        null
+                    }
+                    
+                    if (refreshResponse?.isSuccessful == true) {
+                        val bodyString = refreshResponse.body?.string()
+                        if (bodyString != null) {
+                            try {
+                                val jsonObject = org.json.JSONObject(bodyString)
+                                val newToken = jsonObject.optString("token")
+                                val newRefreshToken = jsonObject.optString("refreshToken", "")
+                                
+                                if (newToken.isNotEmpty()) {
+                                    tokenManager.saveToken(newToken)
+                                    if (newRefreshToken.isNotEmpty()) {
+                                        tokenManager.saveRefreshToken(newRefreshToken)
+                                    }
+                                    
+                                    val newRequest = request.newBuilder()
+                                        .header("Authorization", "Bearer $newToken")
+                                        .build()
+                                    return@Interceptor chain.proceed(newRequest)
+                                }
+                            } catch (e: Exception) {
+                                // JSON parse failed
+                            }
+                        }
+                    }
+                    refreshResponse?.close()
+                }
+                
+                // Refresh failed or no refresh token
                 tokenManager.clearToken()
             }
             response
@@ -94,5 +141,11 @@ object AppModule {
     @Singleton
     fun provideCaseDao(database: AppDatabase): CaseDao {
         return database.caseDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideDashboardDao(database: AppDatabase): com.example.phishtrack.data.local.DashboardDao {
+        return database.dashboardDao()
     }
 }

@@ -84,13 +84,8 @@ fun LoginScreen(
             is UiState.Success -> {
                 val data = (loginState as UiState.Success).data
                 viewModel.resetStates()
-                if (data.token != null) {
-                    // Test account bypasses OTP and logs in directly
-                    onLoginSuccess(email, data.token, data.user?.id)
-                } else {
-                    // Normal login redirects to OTP verification
-                    onLoginSuccess(email, null, null)
-                }
+                // Normal login redirects to OTP verification
+                onLoginSuccess(email, null, null)
             }
             is UiState.Error -> {
                 Toast.makeText(context, (loginState as UiState.Error).message, Toast.LENGTH_LONG).show()

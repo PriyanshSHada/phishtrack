@@ -231,7 +231,14 @@ exports.downloadPdf = async (req, res, next) => {
 
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="PhishTrack_Report_Case_${report.caseId}_v${report.version}.pdf"`);
-    fs.createReadStream(filePath).pipe(res);
+    const readStream = fs.createReadStream(filePath);
+    readStream.on('error', (streamErr) => {
+      console.error('Error reading report file:', streamErr);
+      if (!res.headersSent) {
+        res.status(500).json({ error: 'Failed to read report file' });
+      }
+    });
+    readStream.pipe(res);
   } catch (err) {
     next(err);
   }

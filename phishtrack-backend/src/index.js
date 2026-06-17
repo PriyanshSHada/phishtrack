@@ -2,6 +2,8 @@ const dotenv = require('dotenv');
 dotenv.config();
 
 const express = require('express');
+const cors = require('cors');
+const logger = require('./utils/logger');
 const healthRouter = require('./routes/health.route');
 const authRouter = require('./routes/auth.route');
 const casesRouter = require('./routes/cases.route');
@@ -25,11 +27,12 @@ if (!fs.existsSync(reportsDir)) {
 const requiredEnv = []; // Add 'SMTP_HOST', 'SMTP_USER', 'SMTP_PASS' here if you want to strictly enforce it
 const missing = requiredEnv.filter(k => !process.env[k] || String(process.env[k]).trim() === '');
 if (missing.length) {
-  console.error(`Missing required environment variables: ${missing.join(', ')}.`);
+  logger.error(`Missing required environment variables: ${missing.join(', ')}.`);
   throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
 }
 
 const app = express();
+app.use(cors());
 app.use(express.json());
 
 // Apply Global Rate Limiting (100 req per 15 mins)
@@ -52,13 +55,13 @@ app.use('/api/audit', auditRouter);
 
 // global error handler
 app.use((err, req, res, next) => {
-  console.error(err);
+  logger.error('Unhandled error:', err);
   res.status(500).json({ error: err.message || 'internal server error' });
 });
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, async () => {
-  console.log(`PhishTrack backend listening on port ${PORT}`);
+  logger.info(`PhishTrack backend listening on port ${PORT}`);
 
   // Ensure DB enum has False_Positive (uses direct connection bypassing PgBouncer)
   try {
@@ -67,16 +70,16 @@ app.listen(PORT, async () => {
     const prismaEnsure = new PrismaClient({ datasources: { db: { url: directUrl } } });
     await prismaEnsure.$executeRawUnsafe(`ALTER TYPE "Status" ADD VALUE IF NOT EXISTS 'False_Positive'`);
     await prismaEnsure.$disconnect();
-    console.log('DB enum: False_Positive ensured');
+    logger.info('DB enum: False_Positive ensured');
   } catch (_) {
     // Value already exists or blocked — safe to continue
   }
 
   try {
     await redisClient.connect();
-    console.log('Successfully connected to Redis');
+    logger.info('Successfully connected to Redis');
   } catch (err) {
-    console.error('Failed to connect to Redis on startup:', err);
+    logger.error('Failed to connect to Redis on startup:', err);
   }
 });
 

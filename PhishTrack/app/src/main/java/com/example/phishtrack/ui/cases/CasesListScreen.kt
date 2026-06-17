@@ -16,6 +16,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -26,6 +27,8 @@ import com.example.phishtrack.data.repository.CasesRepository
 import com.example.phishtrack.ui.dashboard.CaseItemCard
 import com.example.phishtrack.ui.dashboard.EmptyCasesPlaceholder
 import kotlinx.coroutines.launch
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -102,7 +105,7 @@ fun CasesListScreen(
                     focusedLabelColor = Color(0x00, 0xF5, 0xFF),
                     unfocusedLabelColor = Color(0x88, 0x92, 0xB0)
                 ),
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f).testTag("searchField")
             )
             Spacer(modifier = Modifier.width(8.dp))
             IconButton(
@@ -220,9 +223,18 @@ fun CasesListScreen(
                 Text(message, color = Color(0x88, 0x92, 0xB0), fontSize = 13.sp, fontWeight = FontWeight.Normal)
             }
         } else {
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxSize()) {
-                items(filteredCases) { case ->
-                    CaseItemCard(case = case, onClick = { onCaseClick(case.id) })
+            val pullRefreshState = rememberPullToRefreshState()
+
+            PullToRefreshBox(
+                isRefreshing = isRefreshing,
+                onRefresh = { refresh() },
+                state = pullRefreshState,
+                modifier = Modifier.fillMaxSize()
+            ) {
+                LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxSize()) {
+                    items(filteredCases) { case ->
+                        CaseItemCard(case = case, onClick = { onCaseClick(case.id) })
+                    }
                 }
             }
         }

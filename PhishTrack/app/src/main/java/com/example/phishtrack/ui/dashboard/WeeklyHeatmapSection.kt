@@ -154,9 +154,19 @@ fun WeeklyHeatmapSection(
 
                 Spacer(modifier = Modifier.height(14.dp))
 
-                // Day labels row (Mon - Sun)
+                // Day labels row — start from the actual day-of-week of 'today minus 27 days'
+                // so the column headers align with the data in the grid below.
+                val dayLabels = listOf("M", "T", "W", "T", "F", "S", "S")
+                val startDayOfWeek = remember(heatmapDays) {
+                    if (heatmapDays.isNotEmpty()) {
+                        // Parse the first date and get its ISO day-of-week (1=Mon … 7=Sun)
+                        val firstDate = java.time.LocalDate.parse(heatmapDays.first().date)
+                        firstDate.dayOfWeek.value - 1 // 0-based index into dayLabels
+                    } else 0
+                }
                 Row(modifier = Modifier.fillMaxWidth()) {
-                    listOf("M", "T", "W", "T", "F", "S", "S").forEach { label ->
+                    for (i in 0 until 7) {
+                        val label = dayLabels[(startDayOfWeek + i) % 7]
                         Text(
                             text = label,
                             modifier = Modifier.weight(1f),

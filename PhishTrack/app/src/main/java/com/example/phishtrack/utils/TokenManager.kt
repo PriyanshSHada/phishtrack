@@ -15,8 +15,19 @@ class TokenManager(context: Context) {
     return prefs.getString("auth_token", null)
   }
 
+  fun saveRefreshToken(token: String) {
+    prefs.edit { putString("refresh_token", token) }
+  }
+
+  fun getRefreshToken(): String? {
+    return prefs.getString("refresh_token", null)
+  }
+
   fun clearToken() {
-    prefs.edit { remove("auth_token") }
+    prefs.edit { 
+        remove("auth_token")
+        remove("refresh_token")
+    }
   }
 
   fun saveEmail(email: String) {

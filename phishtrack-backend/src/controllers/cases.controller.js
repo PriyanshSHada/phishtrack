@@ -56,10 +56,7 @@ exports.createCase = async (req, res, next) => {
   try {
     const { description, url, source, priority, tags } = req.body;
     if (!url) return res.status(400).json({ error: 'Missing url' });
-    const startOfYear = new Date(new Date().getFullYear(), 0, 1);
-    const seq = await prisma.case.count({ where: { created_at: { gte: startOfYear } } });
-    const caseNumber = generateCaseNumber(seq + 1);
-    
+
     let userId = req.user?.userId;
     if (!userId) {
       const firstUser = await prisma.user.findFirst();
@@ -67,18 +64,32 @@ exports.createCase = async (req, res, next) => {
       userId = firstUser.id;
     }
 
-    const data = {
-      case_number: caseNumber,
-      userId,
-      url: url || '',
-      description: description || '',
-      source: source || 'Other',
-      priority: priority || 'Low',
-      tags: Array.isArray(tags) ? tags : []
-    };
-    const created = await prisma.case.create({ data });
+    // Wrap count + create in a transaction to prevent duplicate case numbers
+    // under concurrent requests.
+    const created = await prisma.$transaction(async (tx) => {
+      const startOfYear = new Date(new Date().getFullYear(), 0, 1);
+      const seq = await tx.case.count({ where: { created_at: { gte: startOfYear } } });
+      const caseNumber = generateCaseNumber(seq + 1);
+
+      return tx.case.create({
+        data: {
+          case_number: caseNumber,
+          userId,
+          url: url || '',
+          description: description || '',
+          source: source || 'Other',
+          priority: priority || 'Low',
+          tags: Array.isArray(tags) ? tags : []
+        }
+      });
+    });
+
     res.status(201).json(created);
   } catch (err) {
+    // Handle unique constraint violation gracefully
+    if (err.code === 'P2002' && err.meta?.target?.includes('case_number')) {
+      return res.status(409).json({ error: 'Case number conflict — please retry.' });
+    }
     next(err);
   }
 };

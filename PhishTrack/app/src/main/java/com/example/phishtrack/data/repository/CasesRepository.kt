@@ -3,6 +3,9 @@ package com.example.phishtrack.data.repository
 import com.example.phishtrack.data.api.*
 import com.example.phishtrack.data.local.CaseDao
 import com.example.phishtrack.data.local.entities.CaseEntity
+import com.google.gson.Gson
+import com.example.phishtrack.data.local.DashboardDao
+import com.example.phishtrack.data.local.entities.DashboardCacheEntity
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.flow
@@ -13,8 +16,10 @@ import javax.inject.Singleton
 @Singleton
 class CasesRepository @Inject constructor(
     private val apiService: ApiService,
-    private val caseDao: CaseDao
+    private val caseDao: CaseDao,
+    private val dashboardDao: DashboardDao
 ) {
+    private val gson = Gson()
     // Expose cached cases flow
     val cachedCasesFlow: Flow<List<CaseResponse>> = caseDao.getAllCasesFlow().map { entities ->
         entities.map { entity ->
@@ -218,38 +223,60 @@ class CasesRepository @Inject constructor(
 
     // --- Dashboard ---
     fun getStats(): Flow<Result<StatsResponse>> = flow {
+        val cached = dashboardDao.getCacheById("stats")
+        if (cached != null) {
+            emit(Result.success(gson.fromJson(cached.jsonPayload, StatsResponse::class.java)))
+        }
         try {
             val response = apiService.getDashboardStats()
+            dashboardDao.insertCache(DashboardCacheEntity("stats", gson.toJson(response), System.currentTimeMillis()))
             emit(Result.success(response))
         } catch (e: Exception) {
-            emit(Result.failure(e))
+            if (cached == null) emit(Result.failure(e))
         }
     }
 
     fun getRecentCases(): Flow<Result<List<CaseResponse>>> = flow {
+        val cached = dashboardDao.getCacheById("recent_cases")
+        if (cached != null) {
+            val type = object : com.google.gson.reflect.TypeToken<List<CaseResponse>>() {}.type
+            emit(Result.success(gson.fromJson(cached.jsonPayload, type)))
+        }
         try {
             val response = apiService.getRecentCases()
+            dashboardDao.insertCache(DashboardCacheEntity("recent_cases", gson.toJson(response), System.currentTimeMillis()))
             emit(Result.success(response))
         } catch (e: Exception) {
-            emit(Result.failure(e))
+            if (cached == null) emit(Result.failure(e))
         }
     }
 
     fun getThreatMap(): Flow<Result<List<ThreatLocation>>> = flow {
+        val cached = dashboardDao.getCacheById("threat_map")
+        if (cached != null) {
+            val type = object : com.google.gson.reflect.TypeToken<List<ThreatLocation>>() {}.type
+            emit(Result.success(gson.fromJson(cached.jsonPayload, type)))
+        }
         try {
             val response = apiService.getThreatMap()
+            dashboardDao.insertCache(DashboardCacheEntity("threat_map", gson.toJson(response), System.currentTimeMillis()))
             emit(Result.success(response))
         } catch (e: Exception) {
-            emit(Result.failure(e))
+            if (cached == null) emit(Result.failure(e))
         }
     }
 
     fun getWeeklyGraph(): Flow<Result<WeeklyDashboardResponse>> = flow {
+        val cached = dashboardDao.getCacheById("weekly_graph")
+        if (cached != null) {
+            emit(Result.success(gson.fromJson(cached.jsonPayload, WeeklyDashboardResponse::class.java)))
+        }
         try {
             val response = apiService.getWeeklyGraph()
+            dashboardDao.insertCache(DashboardCacheEntity("weekly_graph", gson.toJson(response), System.currentTimeMillis()))
             emit(Result.success(response))
         } catch (e: Exception) {
-            emit(Result.failure(e))
+            if (cached == null) emit(Result.failure(e))
         }
     }
 

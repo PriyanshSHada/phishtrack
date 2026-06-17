@@ -34,6 +34,8 @@ router.post('/register', registerLimiter, validate(schemas.register), register);
 router.post('/login', loginLimiter, validate(schemas.login), login);
 router.post('/verify-otp', otpLimiter, validate(schemas.verifyOtp), verifyOtp);
 router.post('/resend-otp', resendOtpLimiter, validate(schemas.resendOtp), resendOtp);
+router.post('/refresh', authMiddleware, require('../controllers/auth.controller').refresh);
+router.post('/logout', authMiddleware, require('../controllers/auth.controller').logout);
 router.get('/me', authMiddleware, me);
 
 module.exports = router;

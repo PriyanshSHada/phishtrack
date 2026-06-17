@@ -4,7 +4,7 @@ function getSslDetails(hostname) {
   return new Promise((resolve, reject) => {
     const socket = tls.connect(443, hostname, { servername: hostname, rejectUnauthorized: false }, () => {
       const cert = socket.getPeerCertificate(true);
-      socket.end();
+      socket.destroy();
       if (!cert || Object.keys(cert).length === 0) {
         return resolve({ valid: false, error: 'No certificate found' });
       }

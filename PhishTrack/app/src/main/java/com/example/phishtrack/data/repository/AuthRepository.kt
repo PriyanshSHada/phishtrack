@@ -18,6 +18,9 @@ class AuthRepository @Inject constructor(
             tokenManager.saveEmail(email)
             if (response.token != null) {
                 tokenManager.saveToken(response.token)
+                if (response.refreshToken != null) {
+                    tokenManager.saveRefreshToken(response.refreshToken)
+                }
                 tokenManager.saveUserId(response.user?.id ?: "")
             }
             emit(Result.success(response))
@@ -30,7 +33,10 @@ class AuthRepository @Inject constructor(
         try {
             val response = apiService.verifyOtp(VerifyOtpRequest(email, otp))
             tokenManager.saveToken(response.token)
-            tokenManager.saveUserId(response.user.id)
+            if (response.refreshToken != null) {
+                tokenManager.saveRefreshToken(response.refreshToken)
+            }
+            tokenManager.saveUserId(response.user?.id ?: "")
             emit(Result.success(response))
         } catch (e: Exception) {
             emit(Result.failure(e))

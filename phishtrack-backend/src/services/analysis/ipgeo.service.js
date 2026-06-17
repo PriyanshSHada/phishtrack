@@ -17,6 +17,12 @@ exports.getIpGeoData = async (urlStr) => {
     }
     const data = await res.json();
 
+    // ip-api.com sets status='fail' for private/reserved IPs and other errors
+    if (data.status !== 'success') {
+      console.warn('IP Geo: ip-api returned non-success status for IP', ip, '-', data.message || 'unknown');
+      return null;
+    }
+
     return {
       ip,
       country: data.country || 'Unknown',

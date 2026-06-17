@@ -41,6 +41,12 @@ android {
         excludes += "/META-INF/{AL2.0,LGPL2.1}"
       }
     }
+
+    testOptions {
+        unitTests {
+            isIncludeAndroidResources = true
+        }
+    }
 }
 
 kotlin {
@@ -81,6 +87,25 @@ dependencies {
   // Local tests: jUnit, coroutines, Android runner
   testImplementation(libs.junit)
   testImplementation(libs.kotlinx.coroutines.test)
+
+  // MockK for Kotlin mocking in unit tests
+  testImplementation("io.mockk:mockk:1.13.12")
+
+  // Robolectric: run Android tests on JVM
+  testImplementation("org.robolectric:robolectric:4.13")
+  testImplementation("androidx.test:core-ktx:1.6.1")
+  testImplementation("androidx.test.ext:junit-ktx:1.2.1")
+
+  // Turbine: test Kotlin Flows
+  testImplementation("app.cash.turbine:turbine:1.2.0")
+
+  // Compose UI testing on JVM via Robolectric
+  testImplementation("androidx.compose.ui:ui-test-junit4")
+  debugImplementation("androidx.compose.ui:ui-test-manifest")
+
+  // Hilt testing support
+  testImplementation("com.google.dagger:hilt-android-testing:2.56")
+  add("kaptTest", "com.google.dagger:hilt-android-compiler:2.56")
 
   // Instrumented tests: jUnit rules and runners
   androidTestImplementation(libs.androidx.test.core)

@@ -56,12 +56,7 @@ fun MainNavigation(
               viewModel = authViewModel,
               onNavigateToSignUp = { backStack.add(SignUp) },
               onLoginSuccess = { email, token, userId ->
-                  if (token != null) {
-                      // Test account direct login bypasses verification
-                      backStack.replaceTop(Main)
-                  } else {
-                      backStack.add(OtpVerify(email = email))
-                  }
+                  backStack.add(OtpVerify(email = email))
               },
               onBiometricClick = {
                   // Quick bypass for biometric: log in directly to Main if session exists

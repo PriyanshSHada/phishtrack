@@ -1,6 +1,6 @@
 const prisma = require('../prismaClient');
 const { hashPassword, comparePassword } = require('../utils/hash.util');
-const { signJwt } = require('../utils/jwt.util');
+const { signAccessToken, signRefreshToken, blacklistToken, verifyJwt } = require('../utils/jwt.util');
 const emailService = require('../services/email.service');
 const redisClient = require('../redisClient');
 
@@ -34,12 +34,6 @@ exports.login = async (req, res, next) => {
     if (!user) return res.status(401).json({ error: 'Invalid credentials' });
     const ok = await comparePassword(password, user.password);
     if (!ok) return res.status(401).json({ error: 'Invalid credentials' });
-
-    // Bypass OTP for test account to keep smoke tests running
-    if (email === 'test@example.com') {
-      const token = signJwt({ userId: user.id });
-      return res.json({ token, user: { id: user.id, email: user.email } });
-    }
 
     // Generate 6-digit OTP code
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
@@ -77,15 +71,6 @@ exports.verifyOtp = async (req, res, next) => {
     const user = await prisma.user.findUnique({ where: { email: targetEmail } });
     if (!user) return res.status(404).json({ error: 'User not found' });
 
-    // Bypass OTP check for test@example.com
-    if (targetEmail === 'test@example.com') {
-      if (!user.is_verified) {
-        await prisma.user.update({ where: { id: user.id }, data: { is_verified: true } });
-      }
-      const token = signJwt({ userId: user.id });
-      return res.json({ token, user: { id: user.id, email: user.email } });
-    }
-
     if (!redisClient.isOpen) {
       return res.status(500).json({ error: 'Redis connection unavailable' });
     }
@@ -101,8 +86,9 @@ exports.verifyOtp = async (req, res, next) => {
       await prisma.user.update({ where: { id: user.id }, data: { is_verified: true } });
     }
 
-    const token = signJwt({ userId: user.id });
-    res.json({ token, user: { id: user.id, email: user.email } });
+    const token = signAccessToken({ userId: user.id });
+    const refreshToken = signRefreshToken({ userId: user.id });
+    res.json({ token, refreshToken, user: { id: user.id, email: user.email } });
   } catch (err) {
     console.error(err);
     next(err);
@@ -158,3 +144,53 @@ exports.resendOtp = async (req, res, next) => {
   }
 };
 
+exports.refresh = async (req, res, next) => {
+  try {
+    const { refreshToken } = req.body;
+    if (!refreshToken) return res.status(400).json({ error: 'Refresh token required' });
+    
+    const payload = await verifyJwt(refreshToken);
+    if (!payload || !payload.userId) return res.status(401).json({ error: 'Invalid or expired refresh token' });
+    
+    const user = await prisma.user.findUnique({ where: { id: payload.userId } });
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    
+    const newToken = signAccessToken({ userId: user.id });
+    const newRefreshToken = signRefreshToken({ userId: user.id });
+    
+    const decoded = require('jsonwebtoken').decode(refreshToken);
+    if (decoded && decoded.exp) {
+      const expiresInSecs = decoded.exp - Math.floor(Date.now() / 1000);
+      await blacklistToken(refreshToken, expiresInSecs);
+    }
+    
+    res.json({ token: newToken, refreshToken: newRefreshToken });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.logout = async (req, res, next) => {
+  try {
+    const auth = req.headers.authorization;
+    if (auth && auth.startsWith('Bearer ')) {
+      const token = auth.split(' ')[1];
+      const decoded = require('jsonwebtoken').decode(token);
+      if (decoded && decoded.exp) {
+        const expiresInSecs = decoded.exp - Math.floor(Date.now() / 1000);
+        await blacklistToken(token, expiresInSecs);
+      }
+    }
+    const { refreshToken } = req.body;
+    if (refreshToken) {
+      const decodedRefresh = require('jsonwebtoken').decode(refreshToken);
+      if (decodedRefresh && decodedRefresh.exp) {
+        const expiresInSecs = decodedRefresh.exp - Math.floor(Date.now() / 1000);
+        await blacklistToken(refreshToken, expiresInSecs);
+      }
+    }
+    res.json({ message: 'Logged out successfully' });
+  } catch (err) {
+    next(err);
+  }
+};

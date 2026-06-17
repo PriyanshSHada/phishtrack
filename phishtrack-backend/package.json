@@ -9,14 +9,19 @@
     "compose:up": "docker compose up -d",
     "compose:down": "docker compose down",
     "check:db": "node scripts/check-database-url.js",
-    "migrate:deploy": "node scripts/migrate-deploy.js"
+    "migrate:deploy": "node scripts/migrate-deploy.js",
+    "test": "jest --testPathPatterns=unit --forceExit",
+    "test:unit": "jest --testPathPatterns=unit --forceExit",
+    "test:integration": "jest --testPathPatterns=integration --forceExit --runInBand",
+    "test:all": "jest --forceExit --runInBand",
+    "test:coverage": "jest --coverage --forceExit --runInBand"
   },
   "author": "Priyansh Singh Hada",
   "license": "MIT",
   "dependencies": {
     "@prisma/client": "^5.22.0",
     "bcrypt": "^5.1.1",
-    "dotenv": "^16.0.0",
+    "cors": "^2.8.6",
     "express": "^4.18.2",
     "express-rate-limit": "^8.5.2",
     "jsonwebtoken": "^9.0.2",
@@ -25,10 +30,15 @@
     "puppeteer-core": "^25.1.0",
     "redis": "^6.0.0",
     "whois": "^2.16.1",
+    "winston": "^3.19.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "nodemon": "^3.1.0"
+    "dotenv": "^17.4.2",
+    "jest": "^30.4.2",
+    "nock": "^14.0.15",
+    "nodemon": "^3.1.0",
+    "supertest": "^7.2.2"
   },
   "prisma": {
     "schema": "./prisma/schema.prisma"

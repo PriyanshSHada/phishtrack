@@ -6,8 +6,19 @@ exports.getVirusTotalResult = async (urlStr) => {
   }
 
   try {
+    // Normalize URL: lowercase scheme and host to ensure consistent VT cache hits
+    let normalizedUrl = urlStr;
+    try {
+      const parsed = new URL(urlStr);
+      parsed.protocol = parsed.protocol.toLowerCase();
+      parsed.hostname = parsed.hostname.toLowerCase();
+      normalizedUrl = parsed.toString();
+    } catch (_) {
+      // If URL parsing fails, fall back to the original string
+    }
+
     // Generate URL identifier: base64 without padding, url-safe
-    const urlId = Buffer.from(urlStr).toString('base64')
+    const urlId = Buffer.from(normalizedUrl).toString('base64')
       .replace(/=/g, '')
       .replace(/\+/g, '-')
       .replace(/\//g, '_');

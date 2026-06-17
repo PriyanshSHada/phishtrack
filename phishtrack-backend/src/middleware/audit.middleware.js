@@ -37,7 +37,10 @@ module.exports = (actionOverride) => {
           } else if (req.originalUrl.startsWith('/api/auth/login')) {
             action = 'USER_LOGIN_ATTEMPT';
           } else if (req.originalUrl.startsWith('/api/auth/verify-otp')) {
-            action = 'USER_LOGIN_SUCCESS';
+            // Only mark as success when the OTP was actually accepted
+            action = (res.statusCode >= 200 && res.statusCode < 300)
+              ? 'USER_LOGIN_SUCCESS'
+              : 'USER_LOGIN_FAILED';
           } else if (req.originalUrl.startsWith('/api/auth/register')) {
             action = 'USER_REGISTRATION';
           }

@@ -27,6 +27,7 @@ data class LoginResponse(
     val message: String?,
     val email: String?,
     val token: String?,
+    val refreshToken: String?,
     val user: UserProfile?
 )
 
@@ -37,7 +38,8 @@ data class VerifyOtpRequest(
 
 data class TokenResponse(
     val token: String,
-    val user: UserProfile
+    val refreshToken: String?,
+    val user: UserProfile?
 )
 
 data class ResendOtpRequest(

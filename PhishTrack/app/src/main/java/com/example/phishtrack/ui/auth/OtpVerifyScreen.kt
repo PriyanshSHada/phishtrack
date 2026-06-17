@@ -53,7 +53,7 @@ fun OtpVerifyScreen(
                 val data = (otpVerifyState as UiState.Success).data
                 Toast.makeText(context, "Verification successful!", Toast.LENGTH_SHORT).show()
                 viewModel.resetStates()
-                onVerificationSuccess(data.token, data.user.id)
+                onVerificationSuccess(data.token, data.user?.id ?: "")
             }
             is UiState.Error -> {
                 Toast.makeText(context, (otpVerifyState as UiState.Error).message, Toast.LENGTH_LONG).show()

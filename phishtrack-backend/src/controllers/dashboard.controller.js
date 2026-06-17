@@ -42,15 +42,15 @@ exports.getWeeklyGraph = async (req, res, next) => {
     const totalThisWeekRes = await prisma.$queryRaw`
       SELECT COUNT(*)::int as total
       FROM "Case"
-      WHERE created_at >= CURRENT_DATE - INTERVAL '6 days';
+      WHERE created_at >= CURRENT_DATE - INTERVAL '7 days';
     `;
     const totalThisWeek = totalThisWeekRes[0].total;
 
     const totalLastWeekRes = await prisma.$queryRaw`
       SELECT COUNT(*)::int as total
       FROM "Case"
-      WHERE created_at >= CURRENT_DATE - INTERVAL '13 days'
-        AND created_at < CURRENT_DATE - INTERVAL '6 days';
+      WHERE created_at >= CURRENT_DATE - INTERVAL '14 days'
+        AND created_at < CURRENT_DATE - INTERVAL '7 days';
     `;
     const totalLastWeek = totalLastWeekRes[0].total;
 
