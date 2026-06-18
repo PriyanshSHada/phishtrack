@@ -16,6 +16,7 @@ exports.generateReport = async (req, res, next) => {
     if (!caseData) {
       return res.status(404).json({ error: 'Case not found' });
     }
+    if (caseData.userId !== req.user.userId) return res.status(403).json({ error: 'Access denied' });
 
     const analysis = await prisma.analysis.findFirst({
       where: { caseId },
@@ -146,6 +147,7 @@ exports.getReport = async (req, res, next) => {
       }
     });
     if (!report) return res.status(404).json({ error: 'Report not found' });
+    if (report.case.userId !== req.user.userId) return res.status(403).json({ error: 'Access denied' });
     res.json(report);
   } catch (err) {
     next(err);
@@ -155,6 +157,12 @@ exports.getReport = async (req, res, next) => {
 exports.getReportByCase = async (req, res, next) => {
   try {
     const { caseId } = req.params;
+    
+    // Verify case ownership
+    const caseData = await prisma.case.findUnique({ where: { id: caseId } });
+    if (!caseData) return res.status(404).json({ error: 'Case not found' });
+    if (caseData.userId !== req.user.userId) return res.status(403).json({ error: 'Access denied' });
+
     const reports = await prisma.report.findMany({
       where: { caseId },
       orderBy: { version: 'desc' }
@@ -168,10 +176,11 @@ exports.getReportByCase = async (req, res, next) => {
 exports.downloadPdf = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const report = await prisma.report.findUnique({ where: { id } });
+    const report = await prisma.report.findUnique({ where: { id }, include: { case: true } });
     if (!report) {
       return res.status(404).json({ error: 'Report not found' });
     }
+    if (report.case.userId !== req.user.userId) return res.status(403).json({ error: 'Access denied' });
 
     if (report.supabase_path) {
       const fileName = report.supabase_path.split('/').pop();
@@ -197,6 +206,7 @@ exports.verifyReport = async (req, res, next) => {
       }
     });
     if (!report) return res.status(404).json({ error: 'Report not found' });
+    if (report.case.userId !== req.user.userId) return res.status(403).json({ error: 'Access denied' });
 
     const analysis = await prisma.analysis.findFirst({
       where: { caseId: report.caseId },

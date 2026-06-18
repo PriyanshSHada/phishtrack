@@ -1,5 +1,8 @@
 const crypto = require('crypto');
-const SECRET = process.env.REPORT_SIGN_SECRET || process.env.JWT_SECRET || 'report-dev-secret';
+const SECRET = process.env.REPORT_SIGN_SECRET || process.env.JWT_SECRET;
+if (!SECRET) {
+  throw new Error('FATAL: REPORT_SIGN_SECRET or JWT_SECRET is missing. Cannot start securely.');
+}
 
 exports.sign = (payload) => {
   const hmac = crypto.createHmac('sha256', SECRET);

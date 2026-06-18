@@ -22,11 +22,17 @@ exports.blacklistToken = async (token, expiresInSecs) => {
 
 exports.verifyJwt = async (token) => {
   if (redisClient.isOpen) {
-    const isBlacklisted = await redisClient.get(`bl:${token}`);
-    if (isBlacklisted) {
-      const err = new Error('Token is blacklisted');
-      err.name = 'JsonWebTokenError';
-      throw err;
+    try {
+      const isBlacklisted = await redisClient.get(`bl:${token}`);
+      if (isBlacklisted) {
+        const err = new Error('Token is blacklisted');
+        err.name = 'JsonWebTokenError';
+        throw err;
+      }
+    } catch (err) {
+      if (err.name === 'JsonWebTokenError') throw err;
+      // If Redis connection fails, fallback to local verification
+      console.warn('Redis error during JWT verification, skipping blacklist check:', err.message);
     }
   }
   return jwt.verify(token, SECRET);

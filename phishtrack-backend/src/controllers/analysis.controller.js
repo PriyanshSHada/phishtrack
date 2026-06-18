@@ -16,6 +16,7 @@ exports.runAnalysis = async (req, res, next) => {
 
     const c = await prisma.case.findUnique({ where: { id: caseId } });
     if (!c) return res.status(404).json({ error: 'Case not found' });
+    if (c.userId !== req.user.userId) return res.status(403).json({ error: 'Access denied' });
 
     const url = c.url || 'http://example.com';
 
@@ -119,9 +120,11 @@ exports.getAnalysisByCase = async (req, res, next) => {
     const { caseId } = req.params;
     const analysis = await prisma.analysis.findFirst({
       where: { caseId },
+      include: { case: true },
       orderBy: { analyzed_at: 'desc' }
     });
     if (!analysis) return res.status(404).json({ error: 'No analysis found for this case' });
+    if (analysis.case.userId !== req.user.userId) return res.status(403).json({ error: 'Access denied' });
     res.json(analysis);
   } catch (err) {
     next(err);
@@ -133,11 +136,13 @@ exports.getScreenshot = async (req, res, next) => {
     const { caseId } = req.params;
     const analysis = await prisma.analysis.findFirst({
       where: { caseId },
+      include: { case: true },
       orderBy: { analyzed_at: 'desc' }
     });
     if (!analysis || !analysis.page_screenshot) {
       return res.status(404).json({ error: 'Screenshot not found' });
     }
+    if (analysis.case.userId !== req.user.userId) return res.status(403).json({ error: 'Access denied' });
     
     const screenshot = analysis.page_screenshot;
     if (screenshot.startsWith('data:image/png;base64,')) {

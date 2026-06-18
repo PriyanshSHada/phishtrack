@@ -140,6 +140,9 @@ dependencies {
   // Biometrics Lock
   implementation(libs.androidx.biometric)
 
+  // Security Crypto for EncryptedSharedPreferences
+  implementation("androidx.security:security-crypto:1.1.0-alpha06")
+
   // Coil Image Loading
   implementation(libs.coil.compose)
 }

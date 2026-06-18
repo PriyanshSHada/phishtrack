@@ -2,10 +2,11 @@ const prisma = require('../prismaClient');
 
 exports.getStats = async (req, res, next) => {
   try {
-    const users = await prisma.user.count();
-    const cases = await prisma.case.count();
-    const analyses = await prisma.analysis.count();
-    const reports = await prisma.report.count();
+    const userId = req.user.userId;
+    const users = 1; // Logged-in user represents 1 user
+    const cases = await prisma.case.count({ where: { userId } });
+    const analyses = await prisma.analysis.count({ where: { case: { userId } } });
+    const reports = await prisma.report.count({ where: { case: { userId } } });
     res.json({ users, cases, analyses, reports });
   } catch (err) {
     next(err);
@@ -14,7 +15,12 @@ exports.getStats = async (req, res, next) => {
 
 exports.getRecentCases = async (req, res, next) => {
   try {
-    const recent = await prisma.case.findMany({ orderBy: { created_at: 'desc' }, take: 10 });
+    const userId = req.user.userId;
+    const recent = await prisma.case.findMany({ 
+      where: { userId },
+      orderBy: { created_at: 'desc' }, 
+      take: 10 
+    });
     res.json(recent);
   } catch (err) {
     next(err);
@@ -23,6 +29,8 @@ exports.getRecentCases = async (req, res, next) => {
 
 exports.getWeeklyGraph = async (req, res, next) => {
   try {
+    const userId = req.user.userId;
+
     // 1. Get current week data (last 7 days including today)
     const currentWeekRaw = await prisma.$queryRaw`
       SELECT
@@ -33,7 +41,7 @@ exports.getWeeklyGraph = async (req, res, next) => {
         CURRENT_DATE,
         '1 day'::interval
       ) AS d(date)
-      LEFT JOIN "Case" c ON DATE(c.created_at) = DATE(d.date)
+      LEFT JOIN "Case" c ON DATE(c.created_at) = DATE(d.date) AND c."userId" = ${userId}
       GROUP BY d.date
       ORDER BY d.date ASC;
     `;
@@ -42,14 +50,15 @@ exports.getWeeklyGraph = async (req, res, next) => {
     const totalThisWeekRes = await prisma.$queryRaw`
       SELECT COUNT(*)::int as total
       FROM "Case"
-      WHERE created_at >= CURRENT_DATE - INTERVAL '7 days';
+      WHERE "userId" = ${userId} AND created_at >= CURRENT_DATE - INTERVAL '7 days';
     `;
     const totalThisWeek = totalThisWeekRes[0].total;
 
     const totalLastWeekRes = await prisma.$queryRaw`
       SELECT COUNT(*)::int as total
       FROM "Case"
-      WHERE created_at >= CURRENT_DATE - INTERVAL '14 days'
+      WHERE "userId" = ${userId}
+        AND created_at >= CURRENT_DATE - INTERVAL '14 days'
         AND created_at < CURRENT_DATE - INTERVAL '7 days';
     `;
     const totalLastWeek = totalLastWeekRes[0].total;
@@ -66,7 +75,11 @@ exports.getWeeklyGraph = async (req, res, next) => {
 
 exports.getThreatMap = async (req, res, next) => {
   try {
+    const userId = req.user.userId;
     const analyses = await prisma.analysis.findMany({
+      where: {
+        case: { userId }
+      },
       orderBy: { analyzed_at: 'desc' },
       take: 100,
       include: {

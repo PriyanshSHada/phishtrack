@@ -100,6 +100,7 @@ exports.getCaseById = async (req, res, next) => {
     const { id } = req.params;
     const c = await prisma.case.findUnique({ where: { id }, include: { analyses: true, reports: true, auditLogs: true } });
     if (!c) return res.status(404).json({ error: 'Not found' });
+    if (c.userId !== req.user.userId) return res.status(403).json({ error: 'Access denied' });
     res.json(c);
   } catch (err) {
     next(err);
@@ -114,6 +115,7 @@ exports.updateCase = async (req, res, next) => {
     // Verify case exists before attempting update
     const existing = await prisma.case.findUnique({ where: { id } });
     if (!existing) return res.status(404).json({ error: 'Not found' });
+    if (existing.userId !== req.user.userId) return res.status(403).json({ error: 'Access denied' });
 
     const validStatuses = ['Open', 'Investigating', 'Closed', 'False_Positive'];
     const validPriorities = ['Low', 'Medium', 'High', 'Critical'];
@@ -156,6 +158,7 @@ exports.deleteCase = async (req, res, next) => {
     // Verify case exists before attempting deletion
     const existing = await prisma.case.findUnique({ where: { id } });
     if (!existing) return res.status(404).json({ error: 'Not found' });
+    if (existing.userId !== req.user.userId) return res.status(403).json({ error: 'Access denied' });
 
     // Delete child records first (foreign key constraints)
     await prisma.analysis.deleteMany({ where: { caseId: id } });
@@ -175,6 +178,7 @@ exports.getCaseTimeline = async (req, res, next) => {
     const { id } = req.params;
     const c = await prisma.case.findUnique({ where: { id }, include: { analyses: true, auditLogs: true, reports: true } });
     if (!c) return res.status(404).json({ error: 'Not found' });
+    if (c.userId !== req.user.userId) return res.status(403).json({ error: 'Access denied' });
     // Flatten timeline items
     const timeline = [];
     (c.analyses || []).forEach(a => timeline.push({

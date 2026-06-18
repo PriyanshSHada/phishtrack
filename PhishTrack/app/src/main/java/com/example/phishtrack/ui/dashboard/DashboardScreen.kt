@@ -404,9 +404,8 @@ fun ThreatRadarMapCard(locations: List<ThreatLocation>) {
                                 """.trimIndent()
 
                                 map.setStyle(Style.Builder().fromJson(satelliteMapStyle)) { style ->
-                                    val features = locations
-                                        .filter { it.latitude != null && it.longitude != null }
-                                        .mapIndexed { idx, loc ->
+                                    val features = locations.mapIndexedNotNull { idx, loc ->
+                                        if (loc.latitude != null && loc.longitude != null) {
                                             val props = JsonObject().apply {
                                                 val score = loc.threatScore ?: 0
                                                 addProperty("color", when {
@@ -418,10 +417,11 @@ fun ThreatRadarMapCard(locations: List<ThreatLocation>) {
                                                 addProperty("index", idx)
                                             }
                                             Feature.fromGeometry(
-                                                Point.fromLngLat(loc.longitude!!, loc.latitude!!),
+                                                Point.fromLngLat(loc.longitude ?: 0.0, loc.latitude ?: 0.0),
                                                 props
                                             )
-                                        }
+                                        } else null
+                                    }
 
                                     style.addSource(
                                         GeoJsonSource("threats",
@@ -452,10 +452,11 @@ fun ThreatRadarMapCard(locations: List<ThreatLocation>) {
                                         if (features.isNotEmpty()) {
                                             val idx = features[0].getNumberProperty("index")?.toInt() ?: 0
                                             if (idx < locations.size) {
-                                                selectedThreat = locations[idx]
+                                                val threat = locations[idx]
+                                                selectedThreat = threat
                                                 map.animateCamera(
                                                     CameraUpdateFactory.newLatLngZoom(
-                                                        LatLng(locations[idx].latitude!!, locations[idx].longitude!!),
+                                                        LatLng(threat.latitude ?: 0.0, threat.longitude ?: 0.0),
                                                         4.0
                                                     )
                                                 )

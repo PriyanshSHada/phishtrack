@@ -67,7 +67,7 @@ object AppModule {
                     val refreshRequestBody = jsonBody.toRequestBody(jsonMediaType)
                     
                     val refreshRequest = okhttp3.Request.Builder()
-                        .url("${BASE_URL}auth/refresh")
+                        .url("${BASE_URL}api/auth/refresh")
                         .post(refreshRequestBody)
                         .build()
                         

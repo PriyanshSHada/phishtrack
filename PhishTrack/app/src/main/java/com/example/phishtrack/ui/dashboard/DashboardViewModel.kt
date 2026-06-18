@@ -15,6 +15,7 @@ import com.example.phishtrack.utils.toUserFriendlyMessage
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import android.util.Log
 
 @HiltViewModel
 class DashboardViewModel @Inject constructor(
@@ -44,7 +45,10 @@ class DashboardViewModel @Inject constructor(
             casesRepository.getStats().collect { result ->
                 result.fold(
                     onSuccess = { _statsState.value = UiState.Success(it) },
-                    onFailure = { _statsState.value = UiState.Error(it.toUserFriendlyMessage()) }
+                    onFailure = { 
+                        Log.e("Dashboard", "Error: ${it.message}", it)
+                        _statsState.value = UiState.Error("An error occurred: ${it.message}") 
+                    }
                 )
             }
         }
@@ -53,7 +57,10 @@ class DashboardViewModel @Inject constructor(
             casesRepository.getRecentCases().collect { result ->
                 result.fold(
                     onSuccess = { _recentCasesState.value = UiState.Success(it.take(5)) },
-                    onFailure = { _recentCasesState.value = UiState.Error(it.toUserFriendlyMessage()) }
+                    onFailure = { 
+                        Log.e("Dashboard", "Error: ${it.message}", it)
+                        _recentCasesState.value = UiState.Error("An error occurred: ${it.message}") 
+                    }
                 )
             }
         }
@@ -62,7 +69,10 @@ class DashboardViewModel @Inject constructor(
             casesRepository.getThreatMap().collect { result ->
                 result.fold(
                     onSuccess = { _threatMapState.value = UiState.Success(it) },
-                    onFailure = { _threatMapState.value = UiState.Error(it.toUserFriendlyMessage()) }
+                    onFailure = { 
+                        Log.e("Dashboard", "Error: ${it.message}", it)
+                        _threatMapState.value = UiState.Error("An error occurred: ${it.message}") 
+                    }
                 )
             }
         }
@@ -71,7 +81,10 @@ class DashboardViewModel @Inject constructor(
             casesRepository.getWeeklyGraph().collect { result ->
                 result.fold(
                     onSuccess = { _weeklyGraphState.value = UiState.Success(it) },
-                    onFailure = { _weeklyGraphState.value = UiState.Error(it.toUserFriendlyMessage()) }
+                    onFailure = { 
+                        Log.e("Dashboard", "Error: ${it.message}", it)
+                        _weeklyGraphState.value = UiState.Error("An error occurred: ${it.message}") 
+                    }
                 )
             }
         }
