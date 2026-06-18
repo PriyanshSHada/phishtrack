@@ -8,6 +8,7 @@ data class CaseEntity(
     @PrimaryKey val id: String,
     val caseNumber: String,
     val userId: String,
+    val title: String,
     val url: String,
     val description: String?,
     val source: String,

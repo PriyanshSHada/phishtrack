@@ -11,6 +11,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -23,7 +24,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.ExperimentalFoundationApi
 import com.example.phishtrack.data.api.CaseResponse
-import com.example.phishtrack.data.repository.CasesRepository
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.phishtrack.ui.components.EmptyStateComponent
+import com.example.phishtrack.ui.components.ErrorStateComponent
+import com.example.phishtrack.utils.UiState
 import com.example.phishtrack.ui.dashboard.CaseItemCard
 import com.example.phishtrack.ui.dashboard.EmptyCasesPlaceholder
 import kotlinx.coroutines.launch
@@ -34,7 +38,7 @@ import com.example.phishtrack.ui.theme.shimmerEffect
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CasesListScreen(
-    casesRepository: CasesRepository,
+    viewModel: CasesListViewModel = hiltViewModel(),
     initialDateFilter: String? = null,
     onClearDateFilter: () -> Unit = {},
     onCaseClick: (String) -> Unit
@@ -44,31 +48,71 @@ fun CasesListScreen(
     var selectedPriority by remember { mutableStateOf("All") }
     var selectedDate by remember { mutableStateOf(initialDateFilter) }
     var sortBy by remember { mutableStateOf("Date") }
-    var isRefreshing by remember { mutableStateOf(false) }
 
-    var errorMessage by remember { mutableStateOf<String?>(null) }
-
-    val casesList by casesRepository.cachedCasesFlow.collectAsState(initial = emptyList())
-    val coroutineScope = rememberCoroutineScope()
-
-    fun refresh() {
-        coroutineScope.launch {
-            isRefreshing = true
-            errorMessage = null
-            val statusParam = if (selectedStatus == "All") null else selectedStatus
-            val priorityParam = if (selectedPriority == "All") null else selectedPriority
-            val result = casesRepository.refreshCases(statusParam, priorityParam, selectedDate)
-            if (result.isFailure) {
-                errorMessage = result.exceptionOrNull()?.message ?: "Failed to load cases"
+    var showDatePicker by remember { mutableStateOf(false) }
+    val datePickerState = rememberDatePickerState(
+        selectableDates = object : SelectableDates {
+            override fun isSelectableDate(utcTimeMillis: Long): Boolean {
+                return utcTimeMillis <= System.currentTimeMillis()
             }
-            isRefreshing = false
+        }
+    )
+
+    if (showDatePicker) {
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    showDatePicker = false
+                    datePickerState.selectedDateMillis?.let { millis ->
+                        val sdf = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
+                        selectedDate = sdf.format(java.util.Date(millis))
+                    }
+                }) {
+                    Text("OK", color = Color(0x00, 0xF5, 0xFF))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) {
+                    Text("Cancel", color = Color(0x88, 0x92, 0xB0))
+                }
+            },
+            colors = DatePickerDefaults.colors(containerColor = Color(0x14, 0x18, 0x29))
+        ) {
+            DatePicker(
+                state = datePickerState,
+                colors = DatePickerDefaults.colors(
+                    titleContentColor = Color(0x00, 0xF5, 0xFF),
+                    headlineContentColor = Color.White,
+                    weekdayContentColor = Color(0x88, 0x92, 0xB0),
+                    subheadContentColor = Color.White,
+                    yearContentColor = Color.White,
+                    currentYearContentColor = Color(0x00, 0xF5, 0xFF),
+                    selectedYearContentColor = Color.Black,
+                    selectedYearContainerColor = Color(0x00, 0xF5, 0xFF),
+                    dayContentColor = Color.White,
+                    selectedDayContentColor = Color.Black,
+                    selectedDayContainerColor = Color(0x00, 0xF5, 0xFF),
+                    todayContentColor = Color(0x00, 0xF5, 0xFF),
+                    todayDateBorderColor = Color(0x00, 0xF5, 0xFF)
+                )
+            )
         }
     }
 
-    LaunchedEffect(selectedStatus, selectedPriority, selectedDate) {
+    val casesList by viewModel.casesList.collectAsState()
+    val refreshState by viewModel.refreshState
+
+    val isRefreshing = refreshState is UiState.Loading
+
+    fun refresh() {
         val statusParam = if (selectedStatus == "All") null else selectedStatus
         val priorityParam = if (selectedPriority == "All") null else selectedPriority
-        casesRepository.refreshCases(statusParam, priorityParam, selectedDate)
+        viewModel.refreshCases(statusParam, priorityParam, selectedDate)
+    }
+
+    LaunchedEffect(selectedStatus, selectedPriority, selectedDate) {
+        refresh()
     }
 
     val filteredCases = remember(casesList, searchQuery, sortBy) {
@@ -138,23 +182,32 @@ fun CasesListScreen(
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        if (selectedDate != null) {
-            Row(modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("Date Filter: ", color = Color(0x88, 0x92, 0xB0), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+        Row(modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text("Date Filter: ", color = Color(0x88, 0x92, 0xB0), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.width(8.dp))
+            Box(
+                modifier = Modifier
+                    .background(if (selectedDate != null) Color(0x00, 0xF5, 0xFF).copy(alpha = 0.15f) else Color(0x14, 0x18, 0x29), RoundedCornerShape(20.dp))
+                    .border(1.dp, if (selectedDate != null) Color(0x00, 0xF5, 0xFF) else Color(0x2A, 0x35, 0x58), RoundedCornerShape(20.dp))
+                    .clickable { showDatePicker = true }
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(selectedDate ?: "All Time", color = if (selectedDate != null) Color(0x00, 0xF5, 0xFF) else Color(0x88, 0x92, 0xB0), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            }
+            if (selectedDate != null) {
                 Spacer(modifier = Modifier.width(8.dp))
-                Box(
+                Icon(
+                    Icons.Default.Clear,
+                    contentDescription = "Clear Date",
+                    tint = Color(0xFF, 0x3B, 0x3B),
                     modifier = Modifier
-                        .background(Color(0xFF, 0x3B, 0x3B).copy(alpha = 0.15f), RoundedCornerShape(20.dp))
-                        .border(1.dp, Color(0xFF, 0x3B, 0x3B), RoundedCornerShape(20.dp))
-                        .clickable {
+                        .size(20.dp)
+                        .clickable { 
                             selectedDate = null
                             onClearDateFilter()
                         }
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("$selectedDate ✕", color = Color(0xFF, 0x3B, 0x3B), fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                }
+                )
             }
         }
 
@@ -219,23 +272,9 @@ fun CasesListScreen(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        if (errorMessage != null && filteredCases.isEmpty()) {
-            Box(
-                modifier = Modifier.fillMaxWidth().fillMaxHeight(0.5f)
-                    .background(Color(0x14, 0x18, 0x29), RoundedCornerShape(8.dp))
-                    .border(1.dp, Color(0xFF, 0x3B, 0x3B).copy(alpha = 0.5f), RoundedCornerShape(8.dp)),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-                    Text("Connection Error", color = Color(0xFF, 0x55, 0x55), fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(errorMessage ?: "Unknown error", color = Color(0x88, 0x92, 0xB0), fontSize = 13.sp)
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Button(onClick = { refresh() }, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF, 0x3B, 0x3B).copy(alpha = 0.2f))) {
-                        Text("Try Again", color = Color(0xFF, 0x55, 0x55))
-                    }
-                }
-            }
+        if (refreshState is UiState.Error && filteredCases.isEmpty()) {
+            val errorMsg = (refreshState as UiState.Error).message
+            ErrorStateComponent(message = errorMsg, onRetry = { refresh() }, modifier = Modifier.fillMaxHeight(0.5f))
         } else if (filteredCases.isEmpty() && isRefreshing) {
             LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxSize()) {
                 items(5) {
@@ -249,15 +288,8 @@ fun CasesListScreen(
                 }
             }
         } else if (filteredCases.isEmpty()) {
-            Box(
-                modifier = Modifier.fillMaxWidth().height(100.dp)
-                    .background(Color(0x14, 0x18, 0x29), RoundedCornerShape(8.dp))
-                    .border(1.dp, Color(0x2A, 0x35, 0x58), RoundedCornerShape(8.dp)),
-                contentAlignment = Alignment.Center
-            ) {
-                val message = if (selectedStatus != "All") "No $selectedStatus cases found." else "No cases found."
-                Text(message, color = Color(0x88, 0x92, 0xB0), fontSize = 13.sp, fontWeight = FontWeight.Normal)
-            }
+            val message = if (selectedStatus != "All") "No $selectedStatus cases found." else "No cases yet"
+            EmptyStateComponent(message = message, modifier = Modifier.fillMaxHeight(0.5f))
         } else {
             val pullRefreshState = rememberPullToRefreshState()
 
@@ -268,6 +300,13 @@ fun CasesListScreen(
                 modifier = Modifier.fillMaxSize()
             ) {
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxSize()) {
+                    if (refreshState is UiState.Error) {
+                        item {
+                            val errorMsg = (refreshState as UiState.Error).message
+                            ErrorStateComponent(message = errorMsg, onRetry = { refresh() })
+                            Spacer(modifier = Modifier.height(8.dp))
+                        }
+                    }
                     items(filteredCases, key = { it.id }) { case ->
                         androidx.compose.animation.AnimatedVisibility(
                             visible = true,

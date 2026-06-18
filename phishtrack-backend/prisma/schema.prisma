@@ -29,6 +29,7 @@ model Case {
   id          String           @id @default(uuid())
   case_number String           @unique
   userId      String
+  title       String           @default("Untitled Case")
   url         String
   description String?
   source      Source

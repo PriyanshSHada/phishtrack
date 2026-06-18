@@ -11,6 +11,8 @@ import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -58,7 +60,9 @@ import com.example.phishtrack.data.api.CaseResponse
 import com.example.phishtrack.data.api.StatsResponse
 import com.example.phishtrack.data.api.ThreatLocation
 import com.example.phishtrack.data.api.WeeklyGraphData
-import com.example.phishtrack.ui.auth.UiState
+import com.example.phishtrack.utils.UiState
+import com.example.phishtrack.ui.components.EmptyStateComponent
+import com.example.phishtrack.ui.components.ErrorStateComponent
 import com.example.phishtrack.ui.theme.shimmerEffect
 
 @Composable
@@ -134,6 +138,10 @@ fun DashboardScreen(
                 is UiState.Loading -> {
                     MetricsGridPlaceholder()
                 }
+                is UiState.Error -> {
+                    val errorMsg = (statsState as UiState.Error).message
+                    ErrorStateComponent(message = errorMsg, onRetry = { viewModel.refresh() })
+                }
                 else -> {
                     MetricsGrid(StatsResponse(0, 0, 0, 0))
                 }
@@ -151,11 +159,24 @@ fun DashboardScreen(
                 modifier = Modifier.padding(bottom = 8.dp)
             )
             
-            val locations = when (threatMapState) {
-                is UiState.Success -> (threatMapState as UiState.Success).data
-                else -> emptyList()
+            when (threatMapState) {
+                is UiState.Success -> {
+                    val locations = (threatMapState as UiState.Success).data
+                    ThreatRadarMapCard(locations)
+                }
+                is UiState.Loading -> {
+                    Box(modifier = Modifier.fillMaxWidth().height(240.dp), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = Color(0x00, 0xF5, 0xFF))
+                    }
+                }
+                is UiState.Error -> {
+                    val errorMsg = (threatMapState as UiState.Error).message
+                    ErrorStateComponent(message = errorMsg, onRetry = { viewModel.refresh() })
+                }
+                else -> {
+                    ThreatRadarMapCard(emptyList())
+                }
             }
-            ThreatRadarMapCard(locations)
 
             Spacer(modifier = Modifier.height(24.dp))
 
@@ -169,14 +190,30 @@ fun DashboardScreen(
                 modifier = Modifier.padding(bottom = 8.dp)
             )
             
-            val weeklyData = when (weeklyGraphState) {
-                is UiState.Success -> (weeklyGraphState as UiState.Success).data
-                else -> null
+            when (weeklyGraphState) {
+                is UiState.Success -> {
+                    val weeklyData = (weeklyGraphState as UiState.Success).data
+                    WeeklyHeatmapSection(
+                        weeklyData = weeklyData.currentWeek,
+                        onDateSelected = onDateFilterClick
+                    )
+                }
+                is UiState.Loading -> {
+                    Box(modifier = Modifier.fillMaxWidth().height(240.dp), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = Color(0x00, 0xF5, 0xFF))
+                    }
+                }
+                is UiState.Error -> {
+                    val errorMsg = (weeklyGraphState as UiState.Error).message
+                    ErrorStateComponent(message = errorMsg, onRetry = { viewModel.refresh() })
+                }
+                else -> {
+                    WeeklyHeatmapSection(
+                        weeklyData = emptyList(),
+                        onDateSelected = onDateFilterClick
+                    )
+                }
             }
-            WeeklyHeatmapSection(
-                weeklyData = weeklyData?.currentWeek ?: emptyList(),
-                onDateSelected = onDateFilterClick
-            )
 
             Spacer(modifier = Modifier.height(24.dp))
 
@@ -194,11 +231,15 @@ fun DashboardScreen(
                 is UiState.Success -> {
                     val cases = (recentCasesState as UiState.Success).data
                     if (cases.isEmpty()) {
-                        EmptyCasesPlaceholder()
+                        EmptyStateComponent(message = "No analysis data yet")
                     } else {
-                        cases.forEach { case ->
-                            CaseItemCard(case = case, onClick = { onCaseClick(case.id) })
-                            Spacer(modifier = Modifier.height(10.dp))
+                        LazyColumn(
+                            modifier = Modifier.heightIn(max = 500.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            items(cases, key = { it.id }) { case ->
+                                CaseItemCard(case = case, onClick = { onCaseClick(case.id) })
+                            }
                         }
                     }
                 }
@@ -209,18 +250,10 @@ fun DashboardScreen(
                 }
                 is UiState.Error -> {
                     val errorMsg = (recentCasesState as UiState.Error).message
-                    Box(modifier = Modifier.fillMaxWidth().height(100.dp).background(Color(0x14, 0x18, 0x29), RoundedCornerShape(8.dp)).border(1.dp, Color(0xFF, 0x3B, 0x3B).copy(alpha = 0.5f), RoundedCornerShape(8.dp)), contentAlignment = Alignment.Center) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-                            Text("Connection Error", color = Color(0xFF, 0x55, 0x55), fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Button(onClick = { viewModel.loadDashboardData() }, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF, 0x3B, 0x3B).copy(alpha = 0.2f)), modifier = Modifier.height(36.dp)) {
-                                Text("Retry", color = Color(0xFF, 0x55, 0x55), fontSize = 12.sp)
-                            }
-                        }
-                    }
+                    ErrorStateComponent(message = errorMsg, onRetry = { viewModel.refresh() })
                 }
                 else -> {
-                    EmptyCasesPlaceholder()
+                    EmptyStateComponent(message = "No analysis data yet")
                 }
             }
 

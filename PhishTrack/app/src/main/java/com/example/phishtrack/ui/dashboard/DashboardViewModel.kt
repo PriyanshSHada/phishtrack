@@ -10,7 +10,8 @@ import com.example.phishtrack.data.api.ThreatLocation
 import com.example.phishtrack.data.api.WeeklyDashboardResponse
 import com.example.phishtrack.data.api.WeeklyGraphData
 import com.example.phishtrack.data.repository.CasesRepository
-import com.example.phishtrack.ui.auth.UiState
+import com.example.phishtrack.utils.UiState
+import com.example.phishtrack.utils.toUserFriendlyMessage
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -43,7 +44,7 @@ class DashboardViewModel @Inject constructor(
             casesRepository.getStats().collect { result ->
                 result.fold(
                     onSuccess = { _statsState.value = UiState.Success(it) },
-                    onFailure = { _statsState.value = UiState.Error(it.message ?: "Failed to load stats") }
+                    onFailure = { _statsState.value = UiState.Error(it.toUserFriendlyMessage()) }
                 )
             }
         }
@@ -52,7 +53,7 @@ class DashboardViewModel @Inject constructor(
             casesRepository.getRecentCases().collect { result ->
                 result.fold(
                     onSuccess = { _recentCasesState.value = UiState.Success(it.take(5)) },
-                    onFailure = { _recentCasesState.value = UiState.Error(it.message ?: "Failed to load cases") }
+                    onFailure = { _recentCasesState.value = UiState.Error(it.toUserFriendlyMessage()) }
                 )
             }
         }
@@ -61,7 +62,7 @@ class DashboardViewModel @Inject constructor(
             casesRepository.getThreatMap().collect { result ->
                 result.fold(
                     onSuccess = { _threatMapState.value = UiState.Success(it) },
-                    onFailure = { _threatMapState.value = UiState.Error(it.message ?: "Failed to load threat map") }
+                    onFailure = { _threatMapState.value = UiState.Error(it.toUserFriendlyMessage()) }
                 )
             }
         }
@@ -70,7 +71,7 @@ class DashboardViewModel @Inject constructor(
             casesRepository.getWeeklyGraph().collect { result ->
                 result.fold(
                     onSuccess = { _weeklyGraphState.value = UiState.Success(it) },
-                    onFailure = { _weeklyGraphState.value = UiState.Error(it.message ?: "Failed to load graph") }
+                    onFailure = { _weeklyGraphState.value = UiState.Error(it.toUserFriendlyMessage()) }
                 )
             }
         }

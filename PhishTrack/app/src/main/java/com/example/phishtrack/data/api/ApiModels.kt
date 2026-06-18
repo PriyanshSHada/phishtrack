@@ -61,6 +61,7 @@ data class UserProfile(
 
 // --- Cases ---
 data class CreateCaseRequest(
+    val title: String,
     val url: String,
     val description: String? = null,
     val source: String, // WhatsApp, Email, SMS, Other
@@ -72,6 +73,7 @@ data class CaseResponse(
     val id: String,
     @SerializedName("case_number") val caseNumber: String,
     val userId: String,
+    val title: String,
     val url: String,
     val description: String?,
     val source: String,
@@ -98,6 +100,7 @@ data class CaseDetailResponse(
     val id: String,
     @SerializedName("case_number") val caseNumber: String,
     val userId: String,
+    val title: String,
     val url: String,
     val description: String?,
     val source: String,

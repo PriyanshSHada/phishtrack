@@ -54,7 +54,7 @@ exports.getAllCases = async (req, res, next) => {
 
 exports.createCase = async (req, res, next) => {
   try {
-    const { description, url, source, priority, tags } = req.body;
+    const { title, description, url, source, priority, tags } = req.body;
     if (!url) return res.status(400).json({ error: 'Missing url' });
 
     let userId = req.user?.userId;
@@ -75,6 +75,7 @@ exports.createCase = async (req, res, next) => {
         data: {
           case_number: caseNumber,
           userId,
+          title: title || 'Untitled Case',
           url: url || '',
           description: description || '',
           source: source || 'Other',

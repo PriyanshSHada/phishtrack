@@ -132,9 +132,9 @@ fun MainNavigation(
           val context = LocalContext.current
           NewCaseScreen(
               onBackClick = { backStack.removeLastOrNull() },
-              onSubmitCase = { url, desc, src, priority, tags ->
+              onSubmitCase = { title, url, desc, src, priority, tags ->
                   coroutineScope.launch {
-                      casesRepository.createCase(url, desc, src, priority, tags).collect { result ->
+                      casesRepository.createCase(title, url, desc, src, priority, tags).collect { result ->
                           result.fold(
                               onSuccess = { caseResponse ->
                                   backStack.replaceTop(AnalysisLoading(caseId = caseResponse.id))

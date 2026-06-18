@@ -18,6 +18,7 @@ import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.ImageNotSupported
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
+import com.example.phishtrack.theme.LocalExtendedColors
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -41,6 +42,8 @@ import androidx.core.content.FileProvider
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.phishtrack.data.api.CaseDetailResponse
 import com.example.phishtrack.ui.auth.UiState
+import coil.compose.AsyncImage
+import coil.compose.SubcomposeAsyncImage
 import com.google.gson.JsonObject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -147,14 +150,14 @@ fun ReportScreen(
                     Text(
                         " ⬅ ",
                         fontSize = 20.sp,
-                        color = Color(0x00, 0xF5, 0xFF),
+                        color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier
                             .clickable { onBackClick() }
                             .padding(8.dp)
                     )
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color(0x0A, 0x0E, 0x1A),
+                    containerColor = MaterialTheme.colorScheme.background,
                     titleContentColor = Color.White
                 ),
                 actions = {
@@ -162,35 +165,35 @@ fun ReportScreen(
                         Icon(
                             Icons.Default.Delete,
                             contentDescription = "Delete Case",
-                            tint = Color(0xFF, 0x55, 0x55)
+                            tint = LocalExtendedColors.current.errorLight
                         )
                     }
                 }
             )
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
-        containerColor = Color(0x0A, 0x0E, 0x1A)
+        containerColor = MaterialTheme.colorScheme.background
     ) { paddingValues ->
         if (showDeleteDialog) {
             AlertDialog(
                 onDismissRequest = { showDeleteDialog = false },
                 title = { Text("Delete Case", color = Color.White) },
-                text = { Text("Permanently delete this case and all its analysis data?", color = Color(0x88, 0x92, 0xB0)) },
+                text = { Text("Permanently delete this case and all its analysis data?", color = MaterialTheme.colorScheme.onSurfaceVariant) },
                 confirmButton = {
                     Button(
                         onClick = {
                             showDeleteDialog = false
                             viewModel.deleteCase()
                         },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF, 0x3B, 0x3B))
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
                     ) { Text("DELETE", color = Color.White) }
                 },
                 dismissButton = {
                     TextButton(onClick = { showDeleteDialog = false }) {
-                        Text("Cancel", color = Color(0x88, 0x92, 0xB0))
+                        Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 },
-                containerColor = Color(0x14, 0x18, 0x29)
+                containerColor = MaterialTheme.colorScheme.surface
             )
         }
 
@@ -214,23 +217,22 @@ fun ReportScreen(
                             var offset by remember { mutableStateOf(Offset.Zero) }
                             val screenshot = analysis?.pageScreenshot
                             
-                            var bitmap by remember(screenshot) { mutableStateOf<ImageBitmap?>(null) }
+                            var imageBytes by remember(screenshot) { mutableStateOf<ByteArray?>(null) }
                             
                             LaunchedEffect(screenshot) {
                                 if (screenshot != null && screenshot.startsWith("data:image/png;base64,")) {
                                     withContext(Dispatchers.IO) {
                                         try {
                                             val base64Data = screenshot.substringAfter("base64,")
-                                            val bytes = Base64.decode(base64Data, Base64.DEFAULT)
-                                            bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size).asImageBitmap()
+                                            imageBytes = Base64.decode(base64Data, Base64.DEFAULT)
                                         } catch (e: Exception) {}
                                     }
                                 }
                             }
 
-                            bitmap?.let {
-                                Image(
-                                    bitmap = it,
+                            imageBytes?.let {
+                                AsyncImage(
+                                    model = it,
                                     contentDescription = "Fullscreen Screenshot",
                                     modifier = Modifier
                                         .fillMaxSize()
@@ -274,17 +276,17 @@ fun ReportScreen(
                         .padding(16.dp)
                 ) {
                     Card(
-                        colors = CardDefaults.cardColors(containerColor = Color(0x14, 0x18, 0x29)),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .border(1.dp, Color(0x2A, 0x35, 0x58), RoundedCornerShape(8.dp))
+                            .border(1.dp, MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp))
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
                             Text(text = "CASE: ${detail.caseNumber}", color = Color.White, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, fontSize = 16.sp)
                             Spacer(modifier = Modifier.height(4.dp))
-                            Text(text = "Target URL: ${detail.url}", color = Color(0x88, 0x92, 0xB0), fontSize = 13.sp)
+                            Text(text = "Target URL: ${detail.url}", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
                             Spacer(modifier = Modifier.height(16.dp))
-                            Text(text = "UPDATE STATUS", color = Color(0x88, 0x92, 0xB0), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                            Text(text = "UPDATE STATUS", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                             Spacer(modifier = Modifier.height(8.dp))
                             
                             Row(
@@ -298,10 +300,10 @@ fun ReportScreen(
                                         modifier = Modifier
                                             .weight(1f)
                                             .background(
-                                                color = if (isSelected) Color(0x00, 0xF5, 0xFF).copy(alpha = 0.2f) else Color.Transparent,
+                                                color = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.2f) else Color.Transparent,
                                                 shape = RoundedCornerShape(4.dp)
                                             )
-                                            .border(1.dp, if (isSelected) Color(0x00, 0xF5, 0xFF) else Color(0x2A, 0x35, 0x58), RoundedCornerShape(4.dp))
+                                            .border(1.dp, if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(4.dp))
                                             .clickable {
                                                 viewModel.updateCaseStatus(s)
                                             }
@@ -309,9 +311,9 @@ fun ReportScreen(
                                         contentAlignment = Alignment.Center
                                     ) {
                                         if (isSelected && updatingStatusState) {
-                                            CircularProgressIndicator(color = Color(0x00, 0xF5, 0xFF), modifier = Modifier.size(10.dp), strokeWidth = 1.dp)
+                                            CircularProgressIndicator(color = MaterialTheme.colorScheme.primary, modifier = Modifier.size(10.dp), strokeWidth = 1.dp)
                                         } else {
-                                            Text(text = s.replace("_", " "), color = if (isSelected) Color(0x00, 0xF5, 0xFF) else Color(0x88, 0x92, 0xB0), fontSize = 9.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+                                            Text(text = s.replace("_", " "), color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 9.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
                                         }
                                     }
                                 }
@@ -321,7 +323,7 @@ fun ReportScreen(
 
                     Spacer(modifier = Modifier.height(24.dp))
                     
-                    Text(text = "FORENSIC EVALUATION SUMMARY", color = Color(0x88, 0x92, 0xB0), fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                    Text(text = "FORENSIC EVALUATION SUMMARY", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         text = analysis?.aiSummary ?: "No summary available.",
@@ -332,7 +334,7 @@ fun ReportScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(8.dp))
-                            .background(Color(0x14, 0x18, 0x29))
+                            .background(MaterialTheme.colorScheme.surface)
                             .padding(16.dp)
                     )
 
@@ -340,7 +342,7 @@ fun ReportScreen(
 
                     val techniques = analysis?.aiTechniques ?: emptyList()
                     if (techniques.isNotEmpty()) {
-                        Text(text = "PHISHING TECHNIQUES DETECTED", color = Color(0x88, 0x92, 0xB0), fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                        Text(text = "PHISHING TECHNIQUES DETECTED", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
                         Spacer(modifier = Modifier.height(8.dp))
                         Row(modifier = Modifier
                             .fillMaxWidth()
@@ -348,11 +350,11 @@ fun ReportScreen(
                             techniques.forEach { tech ->
                                 Box(
                                     modifier = Modifier
-                                        .background(Color(0xFF, 0x3B, 0x3B).copy(alpha = 0.15f), RoundedCornerShape(12.dp))
-                                        .border(1.dp, Color(0xFF, 0x3B, 0x3B), RoundedCornerShape(12.dp))
+                                        .background(MaterialTheme.colorScheme.error.copy(alpha = 0.15f), RoundedCornerShape(12.dp))
+                                        .border(1.dp, MaterialTheme.colorScheme.error, RoundedCornerShape(12.dp))
                                         .padding(horizontal = 10.dp, vertical = 4.dp)
                                 ) {
-                                    Text(text = tech, color = Color(0xFF, 0x3B, 0x3B), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    Text(text = tech, color = MaterialTheme.colorScheme.error, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                 }
                             }
                         }
@@ -361,11 +363,12 @@ fun ReportScreen(
 
                     val score = analysis?.threatScore ?: 0
                     val ringColor = when {
-                        score >= 70 -> Color(0xFF, 0x3B, 0x3B)
-                        score >= 40 -> Color(0xFF, 0xA5, 0x00)
-                        else -> Color(0x00, 0xFF, 0x88)
+                        score >= 70 -> MaterialTheme.colorScheme.error
+                        score >= 40 -> LocalExtendedColors.current.warning
+                        else -> LocalExtendedColors.current.success
                     }
 
+                    val surfaceVariantColor = MaterialTheme.colorScheme.surfaceVariant
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.Center,
@@ -376,17 +379,17 @@ fun ReportScreen(
                             modifier = Modifier.size(110.dp)
                         ) {
                             Canvas(modifier = Modifier.fillMaxSize()) {
-                                drawArc(color = Color(0x2A, 0x35, 0x58), startAngle = 0f, sweepAngle = 360f, useCenter = false, style = Stroke(width = 24f))
+                                drawArc(color = surfaceVariantColor, startAngle = 0f, sweepAngle = 360f, useCenter = false, style = Stroke(width = 24f))
                                 drawArc(color = ringColor, startAngle = -90f, sweepAngle = (score / 100f) * 360f, useCenter = false, style = Stroke(width = 24f))
                             }
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 Text(text = "$score", color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
-                                Text(text = "SCORE", color = Color(0x88, 0x92, 0xB0), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                Text(text = "SCORE", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                             }
                         }
                         Spacer(modifier = Modifier.width(32.dp))
                         Column {
-                            Text(text = "Threat Severity", color = Color(0x88, 0x92, 0xB0), fontSize = 13.sp)
+                            Text(text = "Threat Severity", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
                             Spacer(modifier = Modifier.height(4.dp))
                             Box(
                                 modifier = Modifier
@@ -400,7 +403,7 @@ fun ReportScreen(
                     }
 
                     Spacer(modifier = Modifier.height(32.dp))
-                    Text(text = "FORENSIC ARTIFACT DETAILS", color = Color(0x88, 0x92, 0xB0), fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                    Text(text = "FORENSIC ARTIFACT DETAILS", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
                     Spacer(modifier = Modifier.height(10.dp))
 
                     CollapsibleSection(title = "WHOIS Domain Lookup") {
@@ -410,7 +413,7 @@ fun ReportScreen(
                             Text(text = "Country: ${whois.safeString("country") ?: "Unavailable"}", color = Color.White, fontSize = 13.sp)
                             Text(text = "Creation Date: ${whois.safeString("creationDate") ?: "Unavailable"}", color = Color.White, fontSize = 13.sp)
                         } else {
-                            Text(text = "No WHOIS data available.", color = Color(0x88, 0x92, 0xB0), fontSize = 13.sp)
+                            Text(text = "No WHOIS data available.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
                         }
                     }
 
@@ -437,7 +440,7 @@ fun ReportScreen(
                     CollapsibleSection(title = "Redirect Chain") {
                         val chain = analysis?.redirectChain ?: emptyList()
                         if (chain.isEmpty()) {
-                            Text(text = "No redirects observed.", color = Color(0x88, 0x92, 0xB0), fontSize = 13.sp)
+                            Text(text = "No redirects observed.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
                         } else {
                             chain.forEachIndexed { index, url ->
                                 Text(text = "${index + 1}. $url", color = Color.White, fontSize = 12.sp, fontFamily = FontFamily.Monospace, modifier = Modifier.padding(bottom = 4.dp))
@@ -457,7 +460,7 @@ fun ReportScreen(
                                     .padding(4.dp),
                                 contentAlignment = Alignment.Center
                             ) {
-                                var bitmap by remember(screenshot) { mutableStateOf<ImageBitmap?>(null) }
+                                var imageBytes by remember(screenshot) { mutableStateOf<ByteArray?>(null) }
                                 var isDecoding by remember(screenshot) { mutableStateOf(true) }
                                 var decodeError by remember(screenshot) { mutableStateOf(false) }
 
@@ -466,9 +469,7 @@ fun ReportScreen(
                                     try {
                                         withContext(Dispatchers.IO) {
                                             val base64Data = screenshot.substringAfter("base64,")
-                                            val bytes = Base64.decode(base64Data, Base64.DEFAULT)
-                                            val bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
-                                            bitmap = bmp.asImageBitmap()
+                                            imageBytes = Base64.decode(base64Data, Base64.DEFAULT)
                                         }
                                     } catch (e: Exception) {
                                         decodeError = true
@@ -478,23 +479,32 @@ fun ReportScreen(
                                 }
 
                                 if (isDecoding) {
-                                    CircularProgressIndicator(color = Color(0x00, 0xF5, 0xFF))
-                                } else if (decodeError || bitmap == null) {
+                                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                                } else if (decodeError || imageBytes == null) {
                                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                        Icon(Icons.Default.Warning, contentDescription = "Error", tint = Color(0xFF, 0x3B, 0x3B))
-                                        Text("Screenshot unavailable", color = Color(0xFF, 0x3B, 0x3B), fontSize = 13.sp)
+                                        Icon(Icons.Default.Warning, contentDescription = "Error", tint = MaterialTheme.colorScheme.error)
+                                        Text("Screenshot unavailable", color = MaterialTheme.colorScheme.error, fontSize = 13.sp)
                                     }
                                 } else {
                                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                        Image(
-                                            bitmap = bitmap!!,
+                                        SubcomposeAsyncImage(
+                                            model = imageBytes,
                                             contentDescription = "Evidence Screenshot",
                                             modifier = Modifier
                                                 .fillMaxWidth()
-                                                .clip(RoundedCornerShape(6.dp))
+                                                .clip(RoundedCornerShape(6.dp)),
+                                            loading = {
+                                                CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                                            },
+                                            error = {
+                                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                                    Icon(Icons.Default.Warning, contentDescription = "Error", tint = MaterialTheme.colorScheme.error)
+                                                    Text("Failed to load image", color = MaterialTheme.colorScheme.error, fontSize = 13.sp)
+                                                }
+                                            }
                                         )
                                         Spacer(modifier = Modifier.height(8.dp))
-                                        Text("Tap to expand", color = Color(0x88, 0x92, 0xB0), fontSize = 11.sp)
+                                        Text("Tap to expand", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
                                     }
                                 }
                             }
@@ -503,9 +513,9 @@ fun ReportScreen(
                                 horizontalAlignment = Alignment.CenterHorizontally,
                                 modifier = Modifier.fillMaxWidth().padding(16.dp)
                             ) {
-                                Icon(Icons.Default.ImageNotSupported, contentDescription = "Empty", tint = Color(0x88, 0x92, 0xB0))
+                                Icon(Icons.Default.ImageNotSupported, contentDescription = "Empty", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                                 Spacer(modifier = Modifier.height(8.dp))
-                                Text(text = "No screenshot captured.", color = Color(0x88, 0x92, 0xB0), fontSize = 13.sp)
+                                Text(text = "No screenshot captured.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
                             }
                         }
                     }
@@ -516,7 +526,7 @@ fun ReportScreen(
                         if (custodyChainState.isEmpty()) {
                             Text(
                                 text = "No custody chain records found.",
-                                color = Color(0x88, 0x92, 0xB0),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 fontSize = 13.sp,
                                 modifier = Modifier.padding(vertical = 4.dp)
                             )
@@ -532,9 +542,9 @@ fun ReportScreen(
                                         horizontalAlignment = Alignment.CenterHorizontally,
                                         modifier = Modifier.width(24.dp)
                                     ) {
-                                        Box(modifier = Modifier.size(10.dp).clip(CircleShape).background(Color(0x00, 0xF5, 0xFF)))
+                                        Box(modifier = Modifier.size(10.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary))
                                         if (index < custodyChainState.size - 1) {
-                                            Box(modifier = Modifier.width(2.dp).height(95.dp).background(Color(0x2A, 0x35, 0x58)))
+                                            Box(modifier = Modifier.width(2.dp).height(95.dp).background(MaterialTheme.colorScheme.surfaceVariant))
                                         }
                                     }
 
@@ -543,21 +553,21 @@ fun ReportScreen(
                                     Column(modifier = Modifier.weight(1f)) {
                                         Text(text = event.action.uppercase(), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                                         Spacer(modifier = Modifier.height(2.dp))
-                                        Text(text = "Timestamp: ${event.timestamp}", color = Color(0x88, 0x92, 0xB0), fontSize = 11.sp)
-                                        Text(text = "Analyst ID: ${event.userId}", color = Color(0x88, 0x92, 0xB0), fontSize = 11.sp)
+                                        Text(text = "Timestamp: ${event.timestamp}", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
+                                        Text(text = "Analyst ID: ${event.userId}", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
                                         Spacer(modifier = Modifier.height(6.dp))
 
                                         Column(
                                             modifier = Modifier
                                                 .fillMaxWidth()
                                                 .clip(RoundedCornerShape(6.dp))
-                                                .background(Color(0x0A, 0x0E, 0x1A))
-                                                .border(1.dp, Color(0x2A, 0x35, 0x58), RoundedCornerShape(6.dp))
+                                                .background(MaterialTheme.colorScheme.background)
+                                                .border(1.dp, MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(6.dp))
                                                 .padding(8.dp)
                                         ) {
-                                            Text(text = "SHA-256 BEFORE:", color = Color(0x00, 0xF5, 0xFF), fontWeight = FontWeight.SemiBold, fontSize = 9.sp, fontFamily = FontFamily.Monospace)
+                                            Text(text = "SHA-256 BEFORE:", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold, fontSize = 9.sp, fontFamily = FontFamily.Monospace)
                                             Text(text = event.hashBefore ?: "N/A (INITIAL RECORD)", color = Color.White, fontSize = 9.sp, fontFamily = FontFamily.Monospace, modifier = Modifier.padding(bottom = 4.dp))
-                                            Text(text = "SHA-256 AFTER:", color = Color(0x00, 0xFF, 0x88), fontWeight = FontWeight.SemiBold, fontSize = 9.sp, fontFamily = FontFamily.Monospace)
+                                            Text(text = "SHA-256 AFTER:", color = LocalExtendedColors.current.success, fontWeight = FontWeight.SemiBold, fontSize = 9.sp, fontFamily = FontFamily.Monospace)
                                             Text(text = event.hashAfter ?: "N/A", color = Color.White, fontSize = 9.sp, fontFamily = FontFamily.Monospace)
                                         }
                                     }
@@ -578,14 +588,14 @@ fun ReportScreen(
                         Button(
                             onClick = { viewModel.generateReport() },
                             enabled = !isGenerating,
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0x00, 0xF5, 0xFF)),
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                             shape = RoundedCornerShape(6.dp),
                             modifier = Modifier.weight(1f).height(48.dp)
                         ) {
                             if (isGenerating) {
-                                CircularProgressIndicator(color = Color(0x0A, 0x0E, 0x1A), strokeWidth = 2.dp, modifier = Modifier.size(16.dp))
+                                CircularProgressIndicator(color = MaterialTheme.colorScheme.background, strokeWidth = 2.dp, modifier = Modifier.size(16.dp))
                             } else {
-                                Text(text = if (generateFailed) "RETRY" else "COMPILE", color = Color(0x0A, 0x0E, 0x1A), fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                                Text(text = if (generateFailed) "RETRY" else "COMPILE", color = MaterialTheme.colorScheme.background, fontWeight = FontWeight.Bold, fontSize = 11.sp)
                             }
                         }
 
@@ -600,14 +610,14 @@ fun ReportScreen(
                                 }
                             },
                             enabled = latestReport != null && !isDownloading,
-                            colors = ButtonDefaults.buttonColors(containerColor = if (latestReport != null) Color(0x00, 0xFF, 0x88).copy(alpha = 0.15f) else Color(0x2A, 0x35, 0x58)),
+                            colors = ButtonDefaults.buttonColors(containerColor = if (latestReport != null) LocalExtendedColors.current.success.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceVariant),
                             shape = RoundedCornerShape(6.dp),
-                            modifier = Modifier.weight(1f).height(48.dp).border(1.dp, if (latestReport != null) Color(0x00, 0xFF, 0x88) else Color(0x2A, 0x35, 0x58), RoundedCornerShape(6.dp))
+                            modifier = Modifier.weight(1f).height(48.dp).border(1.dp, if (latestReport != null) LocalExtendedColors.current.success else MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(6.dp))
                         ) {
                             if (isDownloading) {
-                                CircularProgressIndicator(color = Color(0x00, 0xFF, 0x88), strokeWidth = 2.dp, modifier = Modifier.size(16.dp))
+                                CircularProgressIndicator(color = LocalExtendedColors.current.success, strokeWidth = 2.dp, modifier = Modifier.size(16.dp))
                             } else {
-                                Text(text = "OPEN PDF", color = if (latestReport != null) Color(0x00, 0xFF, 0x88) else Color(0x55, 0x55, 0x55), fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                                Text(text = "OPEN PDF", color = if (latestReport != null) LocalExtendedColors.current.success else Color(0x55, 0x55, 0x55), fontWeight = FontWeight.Bold, fontSize = 11.sp)
                             }
                         }
 
@@ -619,11 +629,11 @@ fun ReportScreen(
                                     viewModel.verifyReport(latestReport.id)
                                 }
                             },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0x14, 0x18, 0x29)),
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surface),
                             shape = RoundedCornerShape(6.dp),
-                            modifier = Modifier.weight(1f).height(48.dp).border(1.dp, Color(0x00, 0xF5, 0xFF), RoundedCornerShape(6.dp))
+                            modifier = Modifier.weight(1f).height(48.dp).border(1.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(6.dp))
                         ) {
-                            Text(text = "VERIFY", color = Color(0x00, 0xF5, 0xFF), fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                            Text(text = "VERIFY", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold, fontSize = 11.sp)
                         }
                     }
                     Spacer(modifier = Modifier.height(48.dp))
@@ -631,7 +641,7 @@ fun ReportScreen(
             }
             is UiState.Loading -> {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = Color(0x00, 0xF5, 0xFF))
+                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                 }
             }
             else -> {
@@ -641,10 +651,10 @@ fun ReportScreen(
                         Spacer(modifier = Modifier.height(16.dp))
                         Button(
                             onClick = { viewModel.loadData() },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0x00, 0xF5, 0xFF)),
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                             shape = RoundedCornerShape(8.dp)
                         ) {
-                            Text("RETRY", color = Color(0x0A, 0x0E, 0x1A), fontWeight = FontWeight.Bold)
+                            Text("RETRY", color = MaterialTheme.colorScheme.background, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
@@ -664,8 +674,8 @@ fun CollapsibleSection(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(8.dp))
-            .background(Color(0x14, 0x18, 0x29))
-            .border(1.dp, Color(0x2A, 0x35, 0x58), RoundedCornerShape(8.dp))
+            .background(MaterialTheme.colorScheme.surface)
+            .border(1.dp, MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp))
     ) {
         Row(
             modifier = Modifier
@@ -679,7 +689,7 @@ fun CollapsibleSection(
             Icon(
                 imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
                 contentDescription = "Expand/Collapse",
-                tint = Color(0x88, 0x92, 0xB0)
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
 

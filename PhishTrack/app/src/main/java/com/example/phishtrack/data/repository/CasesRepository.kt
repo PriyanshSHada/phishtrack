@@ -27,6 +27,7 @@ class CasesRepository @Inject constructor(
                 id = entity.id,
                 caseNumber = entity.caseNumber,
                 userId = entity.userId,
+                title = entity.title,
                 url = entity.url,
                 description = entity.description,
                 source = entity.source,
@@ -49,6 +50,7 @@ class CasesRepository @Inject constructor(
                     id = case.id,
                     caseNumber = case.caseNumber,
                     userId = case.userId,
+                    title = case.title,
                     url = case.url,
                     description = case.description,
                     source = case.source,
@@ -90,15 +92,16 @@ class CasesRepository @Inject constructor(
         }
     }
 
-    fun createCase(url: String, desc: String?, source: String, priority: String, tags: List<String>): Flow<Result<CaseResponse>> = flow {
+    fun createCase(title: String, url: String, desc: String?, source: String, priority: String, tags: List<String>): Flow<Result<CaseResponse>> = flow {
         try {
-            val response = apiService.createCase(CreateCaseRequest(url, desc, source, priority, tags))
+            val response = apiService.createCase(CreateCaseRequest(title, url, desc, source, priority, tags))
             // Insert created case locally
             caseDao.insertCase(
                 CaseEntity(
                     id = response.id,
                     caseNumber = response.caseNumber,
                     userId = response.userId,
+                    title = response.title,
                     url = response.url,
                     description = response.description,
                     source = response.source,

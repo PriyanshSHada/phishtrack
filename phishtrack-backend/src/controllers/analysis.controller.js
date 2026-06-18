@@ -4,6 +4,7 @@ const ipgeoService = require('../services/analysis/ipgeo.service');
 const sslService = require('../services/analysis/ssl.service');
 const virustotalService = require('../services/analysis/virustotal.service');
 const domainCheckService = require('../services/analysis/domainCheck.service');
+const homographService = require('../services/analysis/homograph.service');
 const puppeteerService = require('../services/sandbox/puppeteer.service');
 const openaiService = require('../services/ai/openai.service');
 const logger = require('../utils/logger');
@@ -25,6 +26,7 @@ exports.runAnalysis = async (req, res, next) => {
       sslResult,
       virustotalResult,
       similarityResult,
+      homographResult,
       sandboxResult
     ] = await Promise.allSettled([
       whoisService.getWhoisData(url),
@@ -32,6 +34,7 @@ exports.runAnalysis = async (req, res, next) => {
       sslService.getSslInfo(url),
       virustotalService.getVirusTotalResult(url),
       domainCheckService.checkSimilarity(url),
+      homographService.detectHomographAttack(url),
       puppeteerService.runSandbox(url)
     ]);
 
@@ -40,6 +43,7 @@ exports.runAnalysis = async (req, res, next) => {
     const ssl = sslResult.status === 'fulfilled' ? sslResult.value : { valid: false, error: 'SSL check failed' };
     const virustotal = virustotalResult.status === 'fulfilled' ? virustotalResult.value : null;
     const similarity = similarityResult.status === 'fulfilled' ? similarityResult.value : null;
+    const homograph = homographResult.status === 'fulfilled' ? homographResult.value : null;
     const sandbox = sandboxResult.status === 'fulfilled' ? sandboxResult.value : {};
 
     // Format results to run GPT analysis
@@ -50,6 +54,7 @@ exports.runAnalysis = async (req, res, next) => {
       ssl,
       virustotal,
       similarity,
+      homograph,
       redirectChain: sandbox.redirectChain || [url]
     };
 

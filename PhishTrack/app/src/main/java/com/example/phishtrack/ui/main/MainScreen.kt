@@ -114,7 +114,6 @@ fun MainScreen(
                     }
                 )
                 1 -> CasesListScreen(
-                    casesRepository = casesRepository,
                     initialDateFilter = selectedDateFilter,
                     onClearDateFilter = { selectedDateFilter = null },
                     onCaseClick = onCaseClick
