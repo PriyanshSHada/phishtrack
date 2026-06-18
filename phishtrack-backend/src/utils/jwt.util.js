@@ -21,15 +21,15 @@ exports.blacklistToken = async (token, expiresInSecs) => {
 };
 
 exports.verifyJwt = async (token) => {
-  try {
-    if (redisClient.isOpen) {
-      const isBlacklisted = await redisClient.get(`bl:${token}`);
-      if (isBlacklisted) return null;
+  if (redisClient.isOpen) {
+    const isBlacklisted = await redisClient.get(`bl:${token}`);
+    if (isBlacklisted) {
+      const err = new Error('Token is blacklisted');
+      err.name = 'JsonWebTokenError';
+      throw err;
     }
-    return jwt.verify(token, SECRET);
-  } catch (err) {
-    return null;
   }
+  return jwt.verify(token, SECRET);
 };
 
 // Backward-compatible alias: tokens used to be signed with 7d expiry;

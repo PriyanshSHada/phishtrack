@@ -165,7 +165,6 @@ fun MainNavigation(
         is Report -> {
           ReportScreen(
               caseId = destination.caseId,
-              casesRepository = casesRepository,
               onBackClick = { backStack.removeLastOrNull() }
           )
         }

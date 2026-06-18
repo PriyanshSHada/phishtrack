@@ -4,43 +4,49 @@ import android.content.Intent
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.util.Base64
-import android.widget.Toast
-import androidx.core.content.FileProvider
-import java.io.File
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.*
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.ImageNotSupported
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.foundation.shape.CircleShape
-import com.example.phishtrack.data.api.AnalysisResponse
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.core.content.FileProvider
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.phishtrack.data.api.CaseDetailResponse
-import com.example.phishtrack.data.api.ChainOfCustodyResponse
-import com.example.phishtrack.data.repository.CasesRepository
 import com.example.phishtrack.ui.auth.UiState
 import com.google.gson.JsonObject
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.File
 
-// Safe helpers — JsonObject.get() may return JsonNull (not Kotlin null),
-// which throws UnsupportedOperationException when you call .asString etc.
 private fun JsonObject?.safeString(key: String): String? =
     try { this?.get(key)?.takeIf { !it.isJsonNull }?.asString } catch (_: Exception) { null }
 
@@ -50,40 +56,79 @@ private fun JsonObject?.safeBoolean(key: String): Boolean? =
 private fun JsonObject?.safeInt(key: String): Int? =
     try { this?.get(key)?.takeIf { !it.isJsonNull }?.asInt } catch (_: Exception) { null }
 
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReportScreen(
     caseId: String,
-    casesRepository: CasesRepository,
+    viewModel: ReportViewModel = hiltViewModel(),
     onBackClick: () -> Unit
 ) {
     val context = LocalContext.current
-    // refreshKey drives the LaunchedEffects — incrementing it retries all data fetches
-    var refreshKey by remember { mutableIntStateOf(0) }
-    var caseDetailState by remember { mutableStateOf<UiState<CaseDetailResponse>>(UiState.Loading) }
-    var generateReportState by remember { mutableStateOf<UiState<Any>>(UiState.Idle) }
-    var custodyChainState by remember { mutableStateOf<List<ChainOfCustodyResponse>>(emptyList()) }
-    var updatingStatus by remember { mutableStateOf<String?>(null) }
-    var showDeleteDialog by remember { mutableStateOf(false) }
-
     val coroutineScope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
 
-    // Reload custody chain whenever refreshKey changes
-    LaunchedEffect(caseId, refreshKey) {
-        casesRepository.getCustodyChain(caseId).collect { result ->
-            result.onSuccess { custodyChainState = it }
+    val caseDetailState by viewModel.caseDetailState.collectAsState()
+    val custodyChainState by viewModel.custodyChainState.collectAsState()
+    val generateReportState by viewModel.generateReportState.collectAsState()
+    val deleteState by viewModel.deleteState.collectAsState()
+    val updatingStatusState by viewModel.updatingStatusState.collectAsState()
+    val downloadState by viewModel.downloadState.collectAsState()
+    val uiEvent by viewModel.uiEvent.collectAsState()
+
+    var showDeleteDialog by remember { mutableStateOf(false) }
+    var showFullscreenImage by remember { mutableStateOf(false) }
+
+    LaunchedEffect(caseId) {
+        viewModel.initialize(caseId)
+    }
+
+    LaunchedEffect(uiEvent) {
+        uiEvent?.let { event ->
+            when (event) {
+                is UiEvent.ShowSnackbar -> {
+                    snackbarHostState.showSnackbar(
+                        message = event.message,
+                        actionLabel = "Dismiss",
+                        duration = SnackbarDuration.Short
+                    )
+                    viewModel.consumeUiEvent()
+                }
+            }
+        }
+    }
+    
+    // Handle download intent when download is successful
+    LaunchedEffect(downloadState) {
+        if (downloadState is UiState.Success) {
+            val bytes = (downloadState as UiState.Success<ByteArray>).data
+            try {
+                val detail = (caseDetailState as? UiState.Success)?.data
+                val latestReport = detail?.reports?.firstOrNull()
+                if (latestReport != null) {
+                    val outputFile = File(context.cacheDir, "report_${latestReport.id}.pdf")
+                    withContext(Dispatchers.IO) {
+                        outputFile.writeBytes(bytes)
+                    }
+                    val uri = FileProvider.getUriForFile(
+                        context, "${context.packageName}.fileprovider", outputFile
+                    )
+                    val intent = Intent(Intent.ACTION_VIEW).apply {
+                        setDataAndType(uri, "application/pdf")
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
+                    context.startActivity(intent)
+                }
+            } catch (e: Exception) {
+                snackbarHostState.showSnackbar("Failed to open PDF: ${e.message}")
+            } finally {
+                viewModel.resetDownloadState()
+            }
         }
     }
 
-    // Reload case detail whenever refreshKey changes
-    LaunchedEffect(caseId, refreshKey) {
-        caseDetailState = UiState.Loading
-        casesRepository.getCaseDetail(caseId).collect { result ->
-            result.fold(
-                onSuccess = { caseDetailState = UiState.Success(it) },
-                onFailure = { caseDetailState = UiState.Error(it.message ?: "Failed to load report") }
-            )
+    if (deleteState is UiState.Success) {
+        LaunchedEffect(Unit) {
+            onBackClick()
         }
     }
 
@@ -123,9 +168,9 @@ fun ReportScreen(
                 }
             )
         },
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         containerColor = Color(0x0A, 0x0E, 0x1A)
     ) { paddingValues ->
-        // Delete confirmation dialog
         if (showDeleteDialog) {
             AlertDialog(
                 onDismissRequest = { showDeleteDialog = false },
@@ -135,23 +180,7 @@ fun ReportScreen(
                     Button(
                         onClick = {
                             showDeleteDialog = false
-                            coroutineScope.launch {
-                                try {
-                                    casesRepository.deleteCase(caseId).collect { result ->
-                                        result.fold(
-                                            onSuccess = {
-                                                Toast.makeText(context, "Case deleted", Toast.LENGTH_SHORT).show()
-                                                onBackClick()
-                                            },
-                                            onFailure = { err ->
-                                                Toast.makeText(context, "Delete failed: ${err.message}", Toast.LENGTH_SHORT).show()
-                                            }
-                                        )
-                                    }
-                                } catch (e: Exception) {
-                                    Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
-                                }
-                            }
+                            viewModel.deleteCase()
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF, 0x3B, 0x3B))
                     ) { Text("DELETE", color = Color.White) }
@@ -170,6 +199,73 @@ fun ReportScreen(
                 val detail = (caseDetailState as UiState.Success).data
                 val analysis = detail.analyses.firstOrNull()
 
+                // Fullscreen Image Dialog
+                if (showFullscreenImage) {
+                    Dialog(
+                        onDismissRequest = { showFullscreenImage = false },
+                        properties = DialogProperties(usePlatformDefaultWidth = false)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(Color.Black)
+                        ) {
+                            var scale by remember { mutableStateOf(1f) }
+                            var offset by remember { mutableStateOf(Offset.Zero) }
+                            val screenshot = analysis?.pageScreenshot
+                            
+                            var bitmap by remember(screenshot) { mutableStateOf<ImageBitmap?>(null) }
+                            
+                            LaunchedEffect(screenshot) {
+                                if (screenshot != null && screenshot.startsWith("data:image/png;base64,")) {
+                                    withContext(Dispatchers.IO) {
+                                        try {
+                                            val base64Data = screenshot.substringAfter("base64,")
+                                            val bytes = Base64.decode(base64Data, Base64.DEFAULT)
+                                            bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size).asImageBitmap()
+                                        } catch (e: Exception) {}
+                                    }
+                                }
+                            }
+
+                            bitmap?.let {
+                                Image(
+                                    bitmap = it,
+                                    contentDescription = "Fullscreen Screenshot",
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .pointerInput(Unit) {
+                                            detectTransformGestures { _, pan, zoom, _ ->
+                                                scale = (scale * zoom).coerceIn(1f, 5f)
+                                                val maxX = (size.width * (scale - 1)) / 2
+                                                val maxY = (size.height * (scale - 1)) / 2
+                                                offset = Offset(
+                                                    x = (offset.x + pan.x).coerceIn(-maxX, maxX),
+                                                    y = (offset.y + pan.y).coerceIn(-maxY, maxY)
+                                                )
+                                            }
+                                        }
+                                        .graphicsLayer(
+                                            scaleX = scale,
+                                            scaleY = scale,
+                                            translationX = offset.x,
+                                            translationY = offset.y
+                                        )
+                                )
+                            }
+                            
+                            IconButton(
+                                onClick = { showFullscreenImage = false },
+                                modifier = Modifier
+                                    .align(Alignment.TopEnd)
+                                    .padding(16.dp)
+                            ) {
+                                Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White)
+                            }
+                        }
+                    }
+                }
+
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
@@ -177,19 +273,17 @@ fun ReportScreen(
                         .verticalScroll(rememberScrollState())
                         .padding(16.dp)
                 ) {
-                    // Case Header
                     Card(
                         colors = CardDefaults.cardColors(containerColor = Color(0x14, 0x18, 0x29)),
-                        modifier = Modifier.fillMaxWidth().border(1.dp, Color(0x2A, 0x35, 0x58), RoundedCornerShape(8.dp))
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .border(1.dp, Color(0x2A, 0x35, 0x58), RoundedCornerShape(8.dp))
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
                             Text(text = "CASE: ${detail.caseNumber}", color = Color.White, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, fontSize = 16.sp)
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(text = "Target URL: ${detail.url}", color = Color(0x88, 0x92, 0xB0), fontSize = 13.sp)
-                            
                             Spacer(modifier = Modifier.height(16.dp))
-                            
-                            // Status Updater Buttons
                             Text(text = "UPDATE STATUS", color = Color(0x88, 0x92, 0xB0), fontSize = 10.sp, fontWeight = FontWeight.Bold)
                             Spacer(modifier = Modifier.height(8.dp))
                             
@@ -209,25 +303,16 @@ fun ReportScreen(
                                             )
                                             .border(1.dp, if (isSelected) Color(0x00, 0xF5, 0xFF) else Color(0x2A, 0x35, 0x58), RoundedCornerShape(4.dp))
                                             .clickable {
-                                                if (updatingStatus == null) {
-                                                    updatingStatus = s
-                                                    coroutineScope.launch {
-                                                        casesRepository.updateCase(caseId, status = s, priority = null, desc = null).collect { result ->
-                                                            result.fold(
-                                                                onSuccess = { refreshKey++ },
-                                                                onFailure = { err ->
-                                                                    Toast.makeText(context, "Failed: ${err.message}", Toast.LENGTH_SHORT).show()
-                                                                }
-                                                            )
-                                                            updatingStatus = null
-                                                        }
-                                                    }
-                                                }
+                                                viewModel.updateCaseStatus(s)
                                             }
                                             .padding(horizontal = 4.dp, vertical = 6.dp),
                                         contentAlignment = Alignment.Center
                                     ) {
-                                        Text(text = s.replace("_", " "), color = if (isSelected) Color(0x00, 0xF5, 0xFF) else Color(0x88, 0x92, 0xB0), fontSize = 9.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+                                        if (isSelected && updatingStatusState) {
+                                            CircularProgressIndicator(color = Color(0x00, 0xF5, 0xFF), modifier = Modifier.size(10.dp), strokeWidth = 1.dp)
+                                        } else {
+                                            Text(text = s.replace("_", " "), color = if (isSelected) Color(0x00, 0xF5, 0xFF) else Color(0x88, 0x92, 0xB0), fontSize = 9.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+                                        }
                                     }
                                 }
                             }
@@ -236,7 +321,6 @@ fun ReportScreen(
 
                     Spacer(modifier = Modifier.height(24.dp))
                     
-                    // AI summary
                     Text(text = "FORENSIC EVALUATION SUMMARY", color = Color(0x88, 0x92, 0xB0), fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
@@ -254,12 +338,13 @@ fun ReportScreen(
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // AI Techniques
                     val techniques = analysis?.aiTechniques ?: emptyList()
                     if (techniques.isNotEmpty()) {
                         Text(text = "PHISHING TECHNIQUES DETECTED", color = Color(0x88, 0x92, 0xB0), fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
                         Spacer(modifier = Modifier.height(8.dp))
-                        Row(modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             techniques.forEach { tech ->
                                 Box(
                                     modifier = Modifier
@@ -274,7 +359,6 @@ fun ReportScreen(
                         Spacer(modifier = Modifier.height(24.dp))
                     }
 
-                    // Threat score circle & Severity Badge
                     val score = analysis?.threatScore ?: 0
                     val ringColor = when {
                         score >= 70 -> Color(0xFF, 0x3B, 0x3B)
@@ -287,46 +371,20 @@ fun ReportScreen(
                         horizontalArrangement = Arrangement.Center,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Threat Arc Ring
                         Box(
                             contentAlignment = Alignment.Center,
                             modifier = Modifier.size(110.dp)
                         ) {
                             Canvas(modifier = Modifier.fillMaxSize()) {
-                                drawArc(
-                                    color = Color(0x2A, 0x35, 0x58),
-                                    startAngle = 0f,
-                                    sweepAngle = 360f,
-                                    useCenter = false,
-                                    style = Stroke(width = 24f)
-                                )
-                                drawArc(
-                                    color = ringColor,
-                                    startAngle = -90f,
-                                    sweepAngle = (score / 100f) * 360f,
-                                    useCenter = false,
-                                    style = Stroke(width = 24f)
-                                )
+                                drawArc(color = Color(0x2A, 0x35, 0x58), startAngle = 0f, sweepAngle = 360f, useCenter = false, style = Stroke(width = 24f))
+                                drawArc(color = ringColor, startAngle = -90f, sweepAngle = (score / 100f) * 360f, useCenter = false, style = Stroke(width = 24f))
                             }
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text(
-                                    text = "$score",
-                                    color = Color.White,
-                                    fontSize = 28.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    fontFamily = FontFamily.Monospace
-                                )
-                                Text(
-                                    text = "SCORE",
-                                    color = Color(0x88, 0x92, 0xB0),
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
+                                Text(text = "$score", color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                                Text(text = "SCORE", color = Color(0x88, 0x92, 0xB0), fontSize = 10.sp, fontWeight = FontWeight.Bold)
                             }
                         }
-
                         Spacer(modifier = Modifier.width(32.dp))
-
                         Column {
                             Text(text = "Threat Severity", color = Color(0x88, 0x92, 0xB0), fontSize = 13.sp)
                             Spacer(modifier = Modifier.height(4.dp))
@@ -336,19 +394,12 @@ fun ReportScreen(
                                     .border(1.dp, ringColor, RoundedCornerShape(4.dp))
                                     .padding(horizontal = 14.dp, vertical = 6.dp)
                             ) {
-                                Text(
-                                    text = analysis?.severity ?: "Low",
-                                    color = ringColor,
-                                    fontSize = 16.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
+                                Text(text = analysis?.severity ?: "Low", color = ringColor, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
 
                     Spacer(modifier = Modifier.height(32.dp))
-
-                    // Collapsible Scans Sections
                     Text(text = "FORENSIC ARTIFACT DETAILS", color = Color(0x88, 0x92, 0xB0), fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
                     Spacer(modifier = Modifier.height(10.dp))
 
@@ -399,27 +450,63 @@ fun ReportScreen(
                     CollapsibleSection(title = "Evidence Screenshot") {
                         val screenshot = analysis?.pageScreenshot
                         if (screenshot != null && screenshot.startsWith("data:image/png;base64,")) {
-                            val bitmap = remember(screenshot) {
-                                try {
-                                    val base64Data = screenshot.substringAfter("base64,")
-                                    val bytes = Base64.decode(base64Data, Base64.DEFAULT)
-                                    BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
-                                } catch (e: Exception) {
-                                    null
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { showFullscreenImage = true }
+                                    .padding(4.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                var bitmap by remember(screenshot) { mutableStateOf<ImageBitmap?>(null) }
+                                var isDecoding by remember(screenshot) { mutableStateOf(true) }
+                                var decodeError by remember(screenshot) { mutableStateOf(false) }
+
+                                LaunchedEffect(screenshot) {
+                                    isDecoding = true
+                                    try {
+                                        withContext(Dispatchers.IO) {
+                                            val base64Data = screenshot.substringAfter("base64,")
+                                            val bytes = Base64.decode(base64Data, Base64.DEFAULT)
+                                            val bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                                            bitmap = bmp.asImageBitmap()
+                                        }
+                                    } catch (e: Exception) {
+                                        decodeError = true
+                                    } finally {
+                                        isDecoding = false
+                                    }
+                                }
+
+                                if (isDecoding) {
+                                    CircularProgressIndicator(color = Color(0x00, 0xF5, 0xFF))
+                                } else if (decodeError || bitmap == null) {
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                        Icon(Icons.Default.Warning, contentDescription = "Error", tint = Color(0xFF, 0x3B, 0x3B))
+                                        Text("Screenshot unavailable", color = Color(0xFF, 0x3B, 0x3B), fontSize = 13.sp)
+                                    }
+                                } else {
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                        Image(
+                                            bitmap = bitmap!!,
+                                            contentDescription = "Evidence Screenshot",
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clip(RoundedCornerShape(6.dp))
+                                        )
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        Text("Tap to expand", color = Color(0x88, 0x92, 0xB0), fontSize = 11.sp)
+                                    }
                                 }
                             }
-                            bitmap?.let {
-                                Image(
-                                    bitmap = it.asImageBitmap(),
-                                    contentDescription = "Evidence Screenshot",
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(200.dp)
-                                        .clip(RoundedCornerShape(6.dp))
-                                )
-                            }
                         } else {
-                            Text(text = "No screenshot captured.", color = Color(0x88, 0x92, 0xB0), fontSize = 13.sp)
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier.fillMaxWidth().padding(16.dp)
+                            ) {
+                                Icon(Icons.Default.ImageNotSupported, contentDescription = "Empty", tint = Color(0x88, 0x92, 0xB0))
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(text = "No screenshot captured.", color = Color(0x88, 0x92, 0xB0), fontSize = 13.sp)
+                            }
                         }
                     }
 
@@ -436,56 +523,30 @@ fun ReportScreen(
                         } else {
                             custodyChainState.forEachIndexed { index, event ->
                                 Row(
-                                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 8.dp),
                                     verticalAlignment = Alignment.Top
                                 ) {
-                                    // Timeline Bullet indicator
                                     Column(
                                         horizontalAlignment = Alignment.CenterHorizontally,
                                         modifier = Modifier.width(24.dp)
                                     ) {
-                                        Box(
-                                            modifier = Modifier
-                                                .size(10.dp)
-                                                .clip(CircleShape)
-                                                .background(Color(0x00, 0xF5, 0xFF)) // Cyan bullet
-                                        )
+                                        Box(modifier = Modifier.size(10.dp).clip(CircleShape).background(Color(0x00, 0xF5, 0xFF)))
                                         if (index < custodyChainState.size - 1) {
-                                            Box(
-                                                modifier = Modifier
-                                                    .width(2.dp)
-                                                    .height(95.dp)
-                                                    .background(Color(0x2A, 0x35, 0x58)) // Line connecting bullets
-                                            )
+                                            Box(modifier = Modifier.width(2.dp).height(95.dp).background(Color(0x2A, 0x35, 0x58)))
                                         }
                                     }
 
                                     Spacer(modifier = Modifier.width(12.dp))
 
                                     Column(modifier = Modifier.weight(1f)) {
-                                        Text(
-                                            text = event.action.uppercase(),
-                                            color = Color.White,
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 13.sp
-                                        )
-
+                                        Text(text = event.action.uppercase(), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                                         Spacer(modifier = Modifier.height(2.dp))
-
-                                        Text(
-                                            text = "Timestamp: ${event.timestamp}",
-                                            color = Color(0x88, 0x92, 0xB0),
-                                            fontSize = 11.sp
-                                        )
-                                        Text(
-                                            text = "Analyst ID: ${event.userId}",
-                                            color = Color(0x88, 0x92, 0xB0),
-                                            fontSize = 11.sp
-                                        )
-
+                                        Text(text = "Timestamp: ${event.timestamp}", color = Color(0x88, 0x92, 0xB0), fontSize = 11.sp)
+                                        Text(text = "Analyst ID: ${event.userId}", color = Color(0x88, 0x92, 0xB0), fontSize = 11.sp)
                                         Spacer(modifier = Modifier.height(6.dp))
 
-                                        // Hashes block
                                         Column(
                                             modifier = Modifier
                                                 .fillMaxWidth()
@@ -494,33 +555,10 @@ fun ReportScreen(
                                                 .border(1.dp, Color(0x2A, 0x35, 0x58), RoundedCornerShape(6.dp))
                                                 .padding(8.dp)
                                         ) {
-                                            Text(
-                                                text = "SHA-256 BEFORE:",
-                                                color = Color(0x00, 0xF5, 0xFF),
-                                                fontWeight = FontWeight.SemiBold,
-                                                fontSize = 9.sp,
-                                                fontFamily = FontFamily.Monospace
-                                            )
-                                            Text(
-                                                text = event.hashBefore ?: "N/A (INITIAL RECORD)",
-                                                color = Color.White,
-                                                fontSize = 9.sp,
-                                                fontFamily = FontFamily.Monospace,
-                                                modifier = Modifier.padding(bottom = 4.dp)
-                                            )
-                                            Text(
-                                                text = "SHA-256 AFTER:",
-                                                color = Color(0x00, 0xFF, 0x88),
-                                                fontWeight = FontWeight.SemiBold,
-                                                fontSize = 9.sp,
-                                                fontFamily = FontFamily.Monospace
-                                            )
-                                            Text(
-                                                text = event.hashAfter ?: "N/A",
-                                                color = Color.White,
-                                                fontSize = 9.sp,
-                                                fontFamily = FontFamily.Monospace
-                                            )
+                                            Text(text = "SHA-256 BEFORE:", color = Color(0x00, 0xF5, 0xFF), fontWeight = FontWeight.SemiBold, fontSize = 9.sp, fontFamily = FontFamily.Monospace)
+                                            Text(text = event.hashBefore ?: "N/A (INITIAL RECORD)", color = Color.White, fontSize = 9.sp, fontFamily = FontFamily.Monospace, modifier = Modifier.padding(bottom = 4.dp))
+                                            Text(text = "SHA-256 AFTER:", color = Color(0x00, 0xFF, 0x88), fontWeight = FontWeight.SemiBold, fontSize = 9.sp, fontFamily = FontFamily.Monospace)
+                                            Text(text = event.hashAfter ?: "N/A", color = Color.White, fontSize = 9.sp, fontFamily = FontFamily.Monospace)
                                         }
                                     }
                                 }
@@ -530,121 +568,55 @@ fun ReportScreen(
 
                     Spacer(modifier = Modifier.height(32.dp))
 
-                    // Action buttons — Compile, Download, Verify
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         val isGenerating = generateReportState is UiState.Loading
+                        val generateFailed = generateReportState is UiState.Error
+                        
                         Button(
-                            onClick = {
-                                if (!isGenerating) {
-                                    generateReportState = UiState.Loading
-                                    coroutineScope.launch {
-                                        casesRepository.generateReport(caseId).collect { result ->
-                                            result.fold(
-                                                onSuccess = {
-                                                    generateReportState = UiState.Success(it)
-                                                    refreshKey++
-                                                    Toast.makeText(context, "Report compiled! Signature saved.", Toast.LENGTH_SHORT).show()
-                                                },
-                                                onFailure = {
-                                                    generateReportState = UiState.Error(it.message ?: "Failed to generate report")
-                                                    Toast.makeText(context, "PDF Error: ${it.message}", Toast.LENGTH_LONG).show()
-                                                }
-                                            )
-                                        }
-                                    }
-                                }
-                            },
+                            onClick = { viewModel.generateReport() },
                             enabled = !isGenerating,
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0x00, 0xF5, 0xFF)),
                             shape = RoundedCornerShape(6.dp),
                             modifier = Modifier.weight(1f).height(48.dp)
                         ) {
                             if (isGenerating) {
-                                CircularProgressIndicator(
-                                    color = Color(0x0A, 0x0E, 0x1A),
-                                    strokeWidth = 2.dp,
-                                    modifier = Modifier.size(16.dp)
-                                )
+                                CircularProgressIndicator(color = Color(0x0A, 0x0E, 0x1A), strokeWidth = 2.dp, modifier = Modifier.size(16.dp))
                             } else {
-                                Text(text = "COMPILE", color = Color(0x0A, 0x0E, 0x1A), fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                                Text(text = if (generateFailed) "RETRY" else "COMPILE", color = Color(0x0A, 0x0E, 0x1A), fontWeight = FontWeight.Bold, fontSize = 11.sp)
                             }
                         }
 
-                        // Download and Open PDF button — uses authenticated HTTP client
                         val latestReport = detail.reports.firstOrNull()
-                        var isDownloading by remember { mutableStateOf(false) }
+                        val isDownloading = downloadState is UiState.Loading
                         Button(
                             onClick = {
-                                if (latestReport != null && !isDownloading) {
-                                    isDownloading = true
-                                    coroutineScope.launch {
-                                        try {
-                                            val bytes = casesRepository.downloadReportBytes(latestReport.id)
-                                            val outputFile = File(context.cacheDir, "report_${latestReport.id}.pdf")
-                                            outputFile.writeBytes(bytes)
-                                            isDownloading = false
-                                            val uri = FileProvider.getUriForFile(
-                                                context, "${context.packageName}.fileprovider", outputFile
-                                            )
-                                            val intent = Intent(Intent.ACTION_VIEW).apply {
-                                                setDataAndType(uri, "application/pdf")
-                                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                            }
-                                            context.startActivity(intent)
-                                        } catch (e: Exception) {
-                                            isDownloading = false
-                                            Toast.makeText(context, "Download error: ${e.message}", Toast.LENGTH_LONG).show()
-                                        }
-                                    }
-                                } else if (latestReport == null) {
-                                    Toast.makeText(context, "Compile the report first", Toast.LENGTH_SHORT).show()
+                                if (latestReport != null) {
+                                    viewModel.downloadReport(latestReport.id)
+                                } else {
+                                    coroutineScope.launch { snackbarHostState.showSnackbar("Compile the report first") }
                                 }
                             },
                             enabled = latestReport != null && !isDownloading,
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = if (latestReport != null) Color(0x00, 0xFF, 0x88).copy(alpha = 0.15f) else Color(0x2A, 0x35, 0x58)
-                            ),
+                            colors = ButtonDefaults.buttonColors(containerColor = if (latestReport != null) Color(0x00, 0xFF, 0x88).copy(alpha = 0.15f) else Color(0x2A, 0x35, 0x58)),
                             shape = RoundedCornerShape(6.dp),
-                            modifier = Modifier.weight(1f).height(48.dp)
-                                .border(1.dp, if (latestReport != null) Color(0x00, 0xFF, 0x88) else Color(0x2A, 0x35, 0x58), RoundedCornerShape(6.dp))
+                            modifier = Modifier.weight(1f).height(48.dp).border(1.dp, if (latestReport != null) Color(0x00, 0xFF, 0x88) else Color(0x2A, 0x35, 0x58), RoundedCornerShape(6.dp))
                         ) {
                             if (isDownloading) {
-                                CircularProgressIndicator(
-                                    color = Color(0x00, 0xFF, 0x88),
-                                    strokeWidth = 2.dp,
-                                    modifier = Modifier.size(16.dp)
-                                )
+                                CircularProgressIndicator(color = Color(0x00, 0xFF, 0x88), strokeWidth = 2.dp, modifier = Modifier.size(16.dp))
                             } else {
-                                Text(
-                                    text = "OPEN PDF",
-                                    color = if (latestReport != null) Color(0x00, 0xFF, 0x88) else Color(0x55, 0x55, 0x55),
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 11.sp
-                                )
+                                Text(text = "OPEN PDF", color = if (latestReport != null) Color(0x00, 0xFF, 0x88) else Color(0x55, 0x55, 0x55), fontWeight = FontWeight.Bold, fontSize = 11.sp)
                             }
                         }
 
                         Button(
                             onClick = {
                                 if (latestReport == null) {
-                                    Toast.makeText(context, "Compile the report first", Toast.LENGTH_SHORT).show()
+                                    coroutineScope.launch { snackbarHostState.showSnackbar("Compile the report first") }
                                 } else {
-                                    coroutineScope.launch {
-                                        casesRepository.verifyReport(latestReport.id).collect { result ->
-                                            result.fold(
-                                                onSuccess = {
-                                                    val status = if (it.valid) "✅ Report verified!" else "⚠️ Tamper detected!"
-                                                    Toast.makeText(context, status, Toast.LENGTH_LONG).show()
-                                                },
-                                                onFailure = {
-                                                    Toast.makeText(context, "Verify error: ${it.message}", Toast.LENGTH_LONG).show()
-                                                }
-                                            )
-                                        }
-                                    }
+                                    viewModel.verifyReport(latestReport.id)
                                 }
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0x14, 0x18, 0x29)),
@@ -654,7 +626,6 @@ fun ReportScreen(
                             Text(text = "VERIFY", color = Color(0x00, 0xF5, 0xFF), fontWeight = FontWeight.Bold, fontSize = 11.sp)
                         }
                     }
-
                     Spacer(modifier = Modifier.height(48.dp))
                 }
             }
@@ -664,19 +635,12 @@ fun ReportScreen(
                 }
             }
             else -> {
-                // Error state — show a Retry button so users can recover without restarting
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    androidx.compose.foundation.layout.Column(
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(
-                            text = "Failed to load report details.",
-                            color = Color.White,
-                            fontSize = 14.sp
-                        )
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(text = "Failed to load report details.", color = Color.White, fontSize = 14.sp)
                         Spacer(modifier = Modifier.height(16.dp))
                         Button(
-                            onClick = { refreshKey++ },
+                            onClick = { viewModel.loadData() },
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0x00, 0xF5, 0xFF)),
                             shape = RoundedCornerShape(8.dp)
                         ) {
@@ -711,12 +675,7 @@ fun CollapsibleSection(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = title,
-                color = Color.White,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Bold
-            )
+            Text(text = title, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
             Icon(
                 imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
                 contentDescription = "Expand/Collapse",

@@ -1,25 +1,9 @@
 const prisma = require('../prismaClient');
 const { sign, verify } = require('../utils/signature.util');
 const pdfService = require('../services/report/pdf.service');
-const path = require('path');
-const fs = require('fs');
 const logger = require('../utils/logger');
 const crypto = require('crypto');
 const storageService = require('../services/storage.service');
-
-// Helper function to calculate SHA-256 of a file
-function getFileHash(filePath) {
-  return new Promise((resolve, reject) => {
-    if (!fs.existsSync(filePath)) {
-      return resolve(null);
-    }
-    const hash = crypto.createHash('sha256');
-    const stream = fs.createReadStream(filePath);
-    stream.on('data', (data) => hash.update(data));
-    stream.on('end', () => resolve(hash.digest('hex')));
-    stream.on('error', (err) => reject(err));
-  });
-}
 
 exports.generateReport = async (req, res, next) => {
   try {
@@ -28,7 +12,6 @@ exports.generateReport = async (req, res, next) => {
       return res.status(400).json({ error: 'Missing caseId' });
     }
 
-    // Resolve case, latest analysis, and user
     const caseData = await prisma.case.findUnique({ where: { id: caseId } });
     if (!caseData) {
       return res.status(404).json({ error: 'Case not found' });
@@ -48,34 +31,25 @@ exports.generateReport = async (req, res, next) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    // Find latest report version to increment
     const latestReport = await prisma.report.findFirst({
       where: { caseId },
       orderBy: { version: 'desc' }
     });
     const version = latestReport ? latestReport.version + 1 : 1;
 
-    // Get previous report PDF hash if exists (for Chain of Custody)
     let hashBefore = null;
     if (latestReport) {
-      const prevPath = path.join(__dirname, '../../uploads/reports', `${latestReport.id}.pdf`);
-      if (fs.existsSync(prevPath)) {
-        hashBefore = await getFileHash(prevPath);
+      const prevCustody = await prisma.chainOfCustody.findFirst({
+        where: { caseId, action: `REPORT_GENERATED_V${latestReport.version}` }
+      });
+      if (prevCustody) {
+        hashBefore = prevCustody.hash_after;
       }
     }
 
     const generatedAt = new Date();
     const reportId = crypto.randomUUID();
-    const reportFilename = `${reportId}.pdf`;
-    
-    // Ensure directory exists
-    const reportsDir = path.join(__dirname, '../../uploads/reports');
-    if (!fs.existsSync(reportsDir)) {
-      fs.mkdirSync(reportsDir, { recursive: true });
-    }
-    const outputPath = path.join(reportsDir, reportFilename);
 
-    // Compute HMAC signature over core metadata
     const payload = {
       caseId: caseData.id,
       caseNumber: caseData.case_number,
@@ -87,7 +61,6 @@ exports.generateReport = async (req, res, next) => {
     };
     const digitalSignature = sign(payload);
 
-    // Fetch chain of custody for the report
     const custodyChain = await prisma.chainOfCustody.findMany({
       where: { caseId },
       orderBy: { timestamp: 'asc' },
@@ -96,8 +69,7 @@ exports.generateReport = async (req, res, next) => {
       }
     });
 
-    // Generate PDF
-    await pdfService.generatePdfReport(outputPath, {
+    const pdfBuffer = await pdfService.generatePdfReport({
       case: caseData,
       analysis: analysis,
       analyst: user,
@@ -107,26 +79,23 @@ exports.generateReport = async (req, res, next) => {
       custodyChain
     });
 
-    // Compute file hash after creation
-    const hashAfter = await getFileHash(outputPath);
+    const hashAfter = crypto.createHash('sha256').update(pdfBuffer).digest('hex');
 
-    // Upload to Cloud Storage
-    const cloudUrl = await storageService.uploadReportPdf(reportId, outputPath);
+    const supabasePath = await storageService.uploadReportPdf(reportId, pdfBuffer);
 
-    // Create Report in Database
     const report = await prisma.report.create({
       data: {
         id: reportId,
         caseId: caseData.id,
         version: version,
         pdf_url: `/api/reports/${reportId}/pdf`,
+        supabase_path: supabasePath,
         digital_signature: digitalSignature,
         generatedById: user.id,
         generated_at: generatedAt
       }
     });
 
-    // Write Chain of Custody entry
     await prisma.chainOfCustody.create({
       data: {
         caseId: caseData.id,
@@ -138,7 +107,6 @@ exports.generateReport = async (req, res, next) => {
       }
     });
 
-    // Add Audit Log
     await prisma.auditLog.create({
       data: {
         userId: user.id,
@@ -147,7 +115,8 @@ exports.generateReport = async (req, res, next) => {
         metadata: {
           reportId: report.id,
           version: version,
-          digital_signature: digitalSignature
+          digital_signature: digitalSignature,
+          supabase_path: supabasePath
         },
         timestamp: generatedAt
       }
@@ -204,55 +173,15 @@ exports.downloadPdf = async (req, res, next) => {
       return res.status(404).json({ error: 'Report not found' });
     }
 
-    // Try cloud storage first
-    const cloudBuffer = await storageService.downloadReportPdf(id);
-    if (cloudBuffer) {
-      res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', `attachment; filename="PhishTrack_Report_Case_${report.caseId}_v${report.version}.pdf"`);
-      return res.send(cloudBuffer);
+    if (report.supabase_path) {
+      const fileName = report.supabase_path.split('/').pop();
+      const signedUrl = await storageService.getSignedUrl(fileName);
+      if (signedUrl) {
+        return res.redirect(302, signedUrl);
+      }
     }
 
-    const filePath = path.join(__dirname, '../../uploads/reports', `${id}.pdf`);
-
-    // If file doesn't exist (Render ephemeral disk), regenerate it
-    if (!fs.existsSync(filePath)) {
-      const caseData = await prisma.case.findUnique({ where: { id: report.caseId } });
-      const analysis = await prisma.analysis.findFirst({
-        where: { caseId: report.caseId },
-        orderBy: { analyzed_at: 'desc' }
-      });
-      const user = await prisma.user.findUnique({ where: { id: report.generatedById } });
-
-      if (!caseData) {
-        return res.status(404).json({ error: 'Associated case not found' });
-      }
-
-      // Ensure directory exists
-      const reportsDir = path.join(__dirname, '../../uploads/reports');
-      if (!fs.existsSync(reportsDir)) {
-        fs.mkdirSync(reportsDir, { recursive: true });
-      }
-
-      await pdfService.generatePdfReport(filePath, {
-        case: caseData,
-        analysis: analysis || {},
-        analyst: user || { name: 'Unknown', email: '' },
-        digitalSignature: report.digital_signature || 'N/A',
-        version: report.version,
-        generated_at: report.generated_at
-      });
-    }
-
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="PhishTrack_Report_Case_${report.caseId}_v${report.version}.pdf"`);
-    const readStream = fs.createReadStream(filePath);
-    readStream.on('error', (streamErr) => {
-      logger.error('Error reading report file', { error: streamErr.message, stack: streamErr.stack });
-      if (!res.headersSent) {
-        res.status(500).json({ error: 'Failed to read report file' });
-      }
-    });
-    readStream.pipe(res);
+    return res.status(404).json({ error: 'PDF not available in cloud storage' });
   } catch (err) {
     next(err);
   }
@@ -269,7 +198,6 @@ exports.verifyReport = async (req, res, next) => {
     });
     if (!report) return res.status(404).json({ error: 'Report not found' });
 
-    // Fetch analysis at the time of report generation
     const analysis = await prisma.analysis.findFirst({
       where: { caseId: report.caseId },
       orderBy: { analyzed_at: 'desc' }
@@ -286,15 +214,20 @@ exports.verifyReport = async (req, res, next) => {
       generatedAt: generatedAtStr
     };
 
-    // 1. Verify HMAC Signature
     const isValidHmac = verify(payload, report.digital_signature);
 
-    // 2. Verify File Hash in Chain of Custody
-    const filePath = path.join(__dirname, '../../uploads/reports', `${id}.pdf`);
-    const fileExists = fs.existsSync(filePath);
-    
     let isHashValid = false;
     let currentFileHash = null;
+    let fileExists = false;
+
+    if (report.supabase_path) {
+      const fileName = report.supabase_path.split('/').pop();
+      const cloudBuffer = await storageService.downloadReportPdf(fileName);
+      if (cloudBuffer) {
+        fileExists = true;
+        currentFileHash = crypto.createHash('sha256').update(cloudBuffer).digest('hex');
+      }
+    }
 
     const custody = await prisma.chainOfCustody.findFirst({
       where: {
@@ -304,20 +237,17 @@ exports.verifyReport = async (req, res, next) => {
     });
 
     if (fileExists && custody) {
-      currentFileHash = await getFileHash(filePath);
       isHashValid = (currentFileHash === custody.hash_after);
     }
 
     const verified = isValidHmac && fileExists && isHashValid;
 
-    // If verification failed and report is not marked as tampered, update it
     if (!verified && !report.is_tampered) {
       await prisma.report.update({
         where: { id },
         data: { is_tampered: true }
       });
       
-      // Log tampering to audit logs
       const auditUserId = req.user?.userId || report.generatedById;
       if (auditUserId) {
         await prisma.auditLog.create({
@@ -349,4 +279,3 @@ exports.verifyReport = async (req, res, next) => {
     next(err);
   }
 };
-

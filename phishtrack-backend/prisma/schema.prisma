@@ -69,6 +69,7 @@ model Report {
   caseId            String
   version           Int      @default(1)
   pdf_url           String?
+  supabase_path     String?
   digital_signature String?
   generatedById     String
   generated_at      DateTime @default(now())

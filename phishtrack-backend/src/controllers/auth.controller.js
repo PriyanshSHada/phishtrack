@@ -150,7 +150,13 @@ exports.refresh = async (req, res, next) => {
     const { refreshToken } = req.body;
     if (!refreshToken) return res.status(400).json({ error: 'Refresh token required' });
     
-    const payload = await verifyJwt(refreshToken);
+    let payload;
+    try {
+      payload = await verifyJwt(refreshToken);
+    } catch (e) {
+      return res.status(401).json({ error: 'Invalid or expired refresh token' });
+    }
+    
     if (!payload || !payload.userId) return res.status(401).json({ error: 'Invalid or expired refresh token' });
     
     const user = await prisma.user.findUnique({ where: { id: payload.userId } });

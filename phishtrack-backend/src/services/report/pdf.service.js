@@ -1,12 +1,16 @@
 const PDFDocument = require('pdfkit');
 const fs = require('fs');
 
-exports.generatePdfReport = (outputPath, data) => {
+exports.generatePdfReport = (data) => {
   return new Promise((resolve, reject) => {
     try {
       const doc = new PDFDocument({ margin: 50, size: 'A4', bufferPages: true });
-      const stream = fs.createWriteStream(outputPath);
-      doc.pipe(stream);
+      const buffers = [];
+      doc.on('data', buffers.push.bind(buffers));
+      doc.on('end', () => {
+        const pdfData = Buffer.concat(buffers);
+        resolve(pdfData);
+      });
 
       // ── Professional Color Palette ──
       const colors = {
@@ -412,8 +416,6 @@ exports.generatePdfReport = (outputPath, data) => {
 
       doc.end();
 
-      stream.on('finish', () => resolve());
-      stream.on('error', (err) => reject(err));
     } catch (err) {
       reject(err);
     }
