@@ -19,6 +19,7 @@ import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import com.example.phishtrack.theme.LocalExtendedColors
 import androidx.compose.runtime.*
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -67,13 +68,12 @@ fun ReportScreen(
     val coroutineScope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
 
-    val caseDetailState by viewModel.caseDetailState.collectAsState()
-    val custodyChainState by viewModel.custodyChainState.collectAsState()
-    val generateReportState by viewModel.generateReportState.collectAsState()
-    val deleteState by viewModel.deleteState.collectAsState()
-    val updatingStatusState by viewModel.updatingStatusState.collectAsState()
-    val downloadState by viewModel.downloadState.collectAsState()
-    val uiEvent by viewModel.uiEvent.collectAsState()
+    val caseDetailState by viewModel.caseDetailState.collectAsStateWithLifecycle()
+    val custodyChainState by viewModel.custodyChainState.collectAsStateWithLifecycle()
+    val generateReportState by viewModel.generateReportState.collectAsStateWithLifecycle()
+    val deleteState by viewModel.deleteState.collectAsStateWithLifecycle()
+    val updatingStatusState by viewModel.updatingStatusState.collectAsStateWithLifecycle()
+    val downloadState by viewModel.downloadState.collectAsStateWithLifecycle()
 
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showFullscreenImage by remember { mutableStateOf(false) }
@@ -82,8 +82,8 @@ fun ReportScreen(
         viewModel.initialize(caseId)
     }
 
-    LaunchedEffect(uiEvent) {
-        uiEvent?.let { event ->
+    LaunchedEffect(Unit) {
+        viewModel.uiEvent.collect { event ->
             when (event) {
                 is UiEvent.ShowSnackbar -> {
                     snackbarHostState.showSnackbar(
@@ -91,7 +91,6 @@ fun ReportScreen(
                         actionLabel = "Dismiss",
                         duration = SnackbarDuration.Short
                     )
-                    viewModel.consumeUiEvent()
                 }
             }
         }
@@ -117,6 +116,15 @@ fun ReportScreen(
                         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                     }
                     context.startActivity(intent)
+                }
+            } catch (e: android.content.ActivityNotFoundException) {
+                snackbarHostState.showSnackbar("No PDF viewer found. Opening Play Store...")
+                try {
+                    val playStoreIntent = Intent(Intent.ACTION_VIEW, Uri.parse("market://search?q=pdf+viewer"))
+                    context.startActivity(playStoreIntent)
+                } catch (playStoreEx: Exception) {
+                    val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/search?q=pdf+viewer"))
+                    context.startActivity(browserIntent)
                 }
             } catch (e: Exception) {
                 snackbarHostState.showSnackbar("Failed to open PDF: ${e.message}")
@@ -223,7 +231,9 @@ fun ReportScreen(
                                         try {
                                             val base64Data = screenshot.substringAfter("base64,")
                                             imageBytes = Base64.decode(base64Data, Base64.DEFAULT)
-                                        } catch (e: Exception) {}
+                                        } catch (e: Exception) {
+                                            coroutineScope.launch { snackbarHostState.showSnackbar("Failed to decode screenshot") }
+                                        }
                                     }
                                 }
                             }
@@ -671,7 +681,9 @@ fun ReportScreen(
                                     tid = obj.get("id")?.asString ?: "?"
                                     name = obj.get("name")?.asString ?: "Unknown"
                                     tactic = obj.get("tactic")?.asString ?: "?"
-                                } catch (_: Exception) {}
+                                } catch (e: Exception) {
+                                    coroutineScope.launch { snackbarHostState.showSnackbar("Failed to parse AI tags") }
+                                }
 
                                 if (obj != null) {
                                     Row(

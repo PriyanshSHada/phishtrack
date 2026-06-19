@@ -10,6 +10,8 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -39,10 +41,9 @@ class ReportViewModel @Inject constructor(
     private val _downloadState = MutableStateFlow<UiState<ByteArray>>(UiState.Idle)
     val downloadState: StateFlow<UiState<ByteArray>> = _downloadState.asStateFlow()
 
-    // Transient UI Events (Snackbars, Toasts) can be emitted via SharedFlow or by letting UI reset state
-    // For simplicity, we'll expose error strings here for the screen to show and then clear.
-    private val _uiEvent = MutableStateFlow<UiEvent?>(null)
-    val uiEvent: StateFlow<UiEvent?> = _uiEvent.asStateFlow()
+    // Transient UI Events (Snackbars, Toasts) via Channel
+    private val _uiEvent = Channel<UiEvent>()
+    val uiEvent = _uiEvent.receiveAsFlow()
 
     private var currentCaseId: String? = null
 
@@ -85,7 +86,7 @@ class ReportViewModel @Inject constructor(
                         loadData() // Refresh details
                     },
                     onFailure = { err ->
-                        _uiEvent.value = UiEvent.ShowSnackbar("Failed to update status: ${err.message}")
+                        _uiEvent.send(UiEvent.ShowSnackbar("Failed to update status: ${err.message}"))
                     }
                 )
                 _updatingStatusState.value = false
@@ -104,7 +105,7 @@ class ReportViewModel @Inject constructor(
                     },
                     onFailure = { err ->
                         _deleteState.value = UiState.Error(err.message ?: "Delete failed")
-                        _uiEvent.value = UiEvent.ShowSnackbar("Delete failed: ${err.message}")
+                        _uiEvent.send(UiEvent.ShowSnackbar("Delete failed: ${err.message}"))
                     }
                 )
             }
@@ -122,11 +123,11 @@ class ReportViewModel @Inject constructor(
                     onSuccess = {
                         _generateReportState.value = UiState.Success(it)
                         loadData() // refresh to get new PDF link
-                        _uiEvent.value = UiEvent.ShowSnackbar("Report compiled! Signature saved.")
+                        _uiEvent.send(UiEvent.ShowSnackbar("Report compiled! Signature saved."))
                     },
                     onFailure = { err ->
                         _generateReportState.value = UiState.Error(err.message ?: "Failed to generate report")
-                        _uiEvent.value = UiEvent.ShowSnackbar("PDF Error: ${err.message}")
+                        _uiEvent.send(UiEvent.ShowSnackbar("PDF Error: ${err.message}"))
                     }
                 )
             }
@@ -143,7 +144,7 @@ class ReportViewModel @Inject constructor(
                 _downloadState.value = UiState.Success(bytes)
             } catch (e: Exception) {
                 _downloadState.value = UiState.Error(e.message ?: "Download failed")
-                _uiEvent.value = UiEvent.ShowSnackbar("Download error: ${e.message}")
+                _uiEvent.send(UiEvent.ShowSnackbar("Download error: ${e.message}"))
             }
         }
     }
@@ -156,20 +157,17 @@ class ReportViewModel @Inject constructor(
                     onSuccess = {
                         _verifyState.value = UiState.Success(it.valid)
                         val statusMsg = if (it.valid) "✅ Report verified!" else "⚠️ Tamper detected!"
-                        _uiEvent.value = UiEvent.ShowSnackbar(statusMsg)
+                        _uiEvent.send(UiEvent.ShowSnackbar(statusMsg))
                     },
                     onFailure = { err ->
                         _verifyState.value = UiState.Error(err.message ?: "Verify error")
-                        _uiEvent.value = UiEvent.ShowSnackbar("Verify error: ${err.message}")
+                        _uiEvent.send(UiEvent.ShowSnackbar("Verify error: ${err.message}"))
                     }
                 )
             }
         }
     }
 
-    fun consumeUiEvent() {
-        _uiEvent.value = null
-    }
 
     fun resetDownloadState() {
         _downloadState.value = UiState.Idle
