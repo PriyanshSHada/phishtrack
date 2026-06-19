@@ -26,8 +26,8 @@ class ReportViewModel @Inject constructor(
     private val _custodyChainState = MutableStateFlow<List<ChainOfCustodyResponse>>(emptyList())
     val custodyChainState: StateFlow<List<ChainOfCustodyResponse>> = _custodyChainState.asStateFlow()
 
-    private val _generateReportState = MutableStateFlow<UiState<Any>>(UiState.Idle)
-    val generateReportState: StateFlow<UiState<Any>> = _generateReportState.asStateFlow()
+    private val _generateReportState = MutableStateFlow<UiState<com.example.phishtrack.data.api.ReportResponse>>(UiState.Idle)
+    val generateReportState: StateFlow<UiState<com.example.phishtrack.data.api.ReportResponse>> = _generateReportState.asStateFlow()
 
     private val _deleteState = MutableStateFlow<UiState<Boolean>>(UiState.Idle)
     val deleteState: StateFlow<UiState<Boolean>> = _deleteState.asStateFlow()
