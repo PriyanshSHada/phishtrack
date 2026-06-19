@@ -48,14 +48,16 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 
-private fun JsonObject?.safeString(key: String): String? =
-    try { this?.get(key)?.takeIf { !it.isJsonNull }?.asString } catch (_: Exception) { null }
+import com.google.gson.JsonElement
 
-private fun JsonObject?.safeBoolean(key: String): Boolean? =
-    try { this?.get(key)?.takeIf { !it.isJsonNull }?.asBoolean } catch (_: Exception) { null }
+private fun JsonElement?.safeString(key: String): String? =
+    try { this?.takeIf { !it.isJsonNull && it.isJsonObject }?.asJsonObject?.get(key)?.takeIf { !it.isJsonNull }?.asString } catch (_: Exception) { null }
 
-private fun JsonObject?.safeInt(key: String): Int? =
-    try { this?.get(key)?.takeIf { !it.isJsonNull }?.asInt } catch (_: Exception) { null }
+private fun JsonElement?.safeBoolean(key: String): Boolean? =
+    try { this?.takeIf { !it.isJsonNull && it.isJsonObject }?.asJsonObject?.get(key)?.takeIf { !it.isJsonNull }?.asBoolean } catch (_: Exception) { null }
+
+private fun JsonElement?.safeInt(key: String): Int? =
+    try { this?.takeIf { !it.isJsonNull && it.isJsonObject }?.asJsonObject?.get(key)?.takeIf { !it.isJsonNull }?.asInt } catch (_: Exception) { null }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
