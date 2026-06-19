@@ -34,6 +34,10 @@ app.use(rateLimitMiddleware({
 
 app.use(auditMiddleware());
 
+app.get('/', (req, res) => {
+  res.json({ message: 'PhishTrack API is running successfully on Railway!' });
+});
+
 app.use('/api', healthRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/cases', casesRouter);
