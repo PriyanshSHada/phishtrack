@@ -136,6 +136,15 @@ fun ReportScreen(
         }
     }
 
+    // Auto-download and open the PDF immediately after compilation
+    LaunchedEffect(generateReportState) {
+        if (generateReportState is UiState.Success) {
+            val report = (generateReportState as UiState.Success).data
+            viewModel.downloadReport(report.id)
+            viewModel.resetGenerateReportState()
+        }
+    }
+
     if (deleteState is UiState.Success) {
         LaunchedEffect(Unit) {
             onBackClick()

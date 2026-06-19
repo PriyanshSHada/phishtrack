@@ -172,6 +172,10 @@ class ReportViewModel @Inject constructor(
     fun resetDownloadState() {
         _downloadState.value = UiState.Idle
     }
+
+    fun resetGenerateReportState() {
+        _generateReportState.value = UiState.Idle
+    }
 }
 
 sealed class UiEvent {
