@@ -35,25 +35,39 @@ exports.runSandbox = async (url) => {
 
     const hash = crypto.createHash('sha256').update(html || '').digest('hex');
 
-    // 2. Get screenshot from ScreenshotOne API
+    // 2. Get screenshot (Fallback to thum.io if ScreenshotOne API key is missing or fails)
+    let screenshotBase64 = null;
     const apiKey = process.env.SCREENSHOTONE_API_KEY;
-    if (!apiKey) {
-      throw new Error('SCREENSHOTONE_API_KEY is not defined in environment variables');
-    }
-
-    const screenshotApiUrl = `https://api.screenshotone.com/take?access_key=${apiKey}&url=${encodeURIComponent(currentUrl)}&full_page=true&viewport_width=1280&viewport_height=720&format=png`;
     
-    const screenshotRes = await axios.get(screenshotApiUrl, {
-      responseType: 'arraybuffer',
-      timeout: 30000
-    });
-
-    const screenshotBase64 = Buffer.from(screenshotRes.data, 'binary').toString('base64');
+    try {
+      if (apiKey) {
+        const screenshotApiUrl = `https://api.screenshotone.com/take?access_key=${apiKey}&url=${encodeURIComponent(currentUrl)}&full_page=true&viewport_width=1280&viewport_height=720&format=png`;
+        const screenshotRes = await axios.get(screenshotApiUrl, {
+          responseType: 'arraybuffer',
+          timeout: 20000
+        });
+        screenshotBase64 = Buffer.from(screenshotRes.data, 'binary').toString('base64');
+      } else {
+        throw new Error('No ScreenshotOne API key');
+      }
+    } catch (apiErr) {
+      logger.warn('ScreenshotOne failed/missing, falling back to thum.io', { url: currentUrl });
+      try {
+        const fallbackUrl = `https://image.thum.io/get/width/1280/crop/720/${currentUrl}`;
+        const fallbackRes = await axios.get(fallbackUrl, {
+          responseType: 'arraybuffer',
+          timeout: 20000
+        });
+        screenshotBase64 = Buffer.from(fallbackRes.data, 'binary').toString('base64');
+      } catch (fallbackErr) {
+        logger.error('Fallback screenshot failed', { error: fallbackErr.message, url: currentUrl });
+      }
+    }
 
     return {
       html,
       pageSourceHash: hash,
-      screenshot: `data:image/png;base64,${screenshotBase64}`,
+      screenshot: screenshotBase64 ? `data:image/png;base64,${screenshotBase64}` : null,
       redirectChain
     };
   } catch (err) {
