@@ -25,7 +25,7 @@ import javax.inject.Singleton
 @InstallIn(SingletonComponent::class)
 object AppModule {
 
-    private const val BASE_URL = "https://phishtrack-production.up.railway.app/"
+    private const val BASE_URL = "https://phishtrack.onrender.com/"
 
     @Provides
     @Singleton
