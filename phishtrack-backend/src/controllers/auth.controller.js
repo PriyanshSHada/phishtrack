@@ -9,6 +9,8 @@ exports.register = async (req, res, next) => {
   try {
     const { email, password, name, organization } = req.body;
     if (!email || !password) return res.status(400).json({ error: 'Missing fields' });
+    const emailRegex = /^\S+@\S+\.\S+$/;
+    if (!emailRegex.test(email)) return res.status(400).json({ error: 'Invalid email format' });
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) return res.status(409).json({ error: 'User already exists' });
     const passwordHash = await hashPassword(password);
@@ -30,6 +32,8 @@ exports.login = async (req, res, next) => {
   try {
     const { email, password } = req.body;
     if (!email || !password) return res.status(400).json({ error: 'Missing fields' });
+    const emailRegex = /^\S+@\S+\.\S+$/;
+    if (!emailRegex.test(email)) return res.status(400).json({ error: 'Invalid email format' });
     const user = await prisma.user.findUnique({ where: { email } });
     if (!user) return res.status(401).json({ error: 'Invalid credentials' });
     const ok = await comparePassword(password, user.password);
@@ -58,29 +62,22 @@ exports.login = async (req, res, next) => {
 
 exports.verifyOtp = async (req, res, next) => {
   try {
-    const { email, userId, otp } = req.body;
-    if ((!email && !userId) || !otp) return res.status(400).json({ error: 'Missing fields' });
+    const { email, otp } = req.body;
+    if (!email || !otp) return res.status(400).json({ error: 'Missing fields (email and otp required)' });
 
-    let targetEmail = email;
-    if (!targetEmail && userId) {
-      const user = await prisma.user.findUnique({ where: { id: userId } });
-      if (!user) return res.status(404).json({ error: 'User not found' });
-      targetEmail = user.email;
-    }
-
-    const user = await prisma.user.findUnique({ where: { email: targetEmail } });
+    const user = await prisma.user.findUnique({ where: { email } });
     if (!user) return res.status(404).json({ error: 'User not found' });
 
     if (!redisClient.isOpen) {
       return res.status(500).json({ error: 'Redis connection unavailable' });
     }
 
-    const cachedOtp = await redisClient.get(`otp:${targetEmail}`);
+    const cachedOtp = await redisClient.get(`otp:${email}`);
     if (!cachedOtp) return res.status(400).json({ error: 'OTP expired or not found' });
     if (cachedOtp !== otp) return res.status(400).json({ error: 'Invalid OTP' });
 
     // Clean up OTP from Redis
-    await redisClient.del(`otp:${targetEmail}`);
+    await redisClient.del(`otp:${email}`);
 
     if (!user.is_verified) {
       await prisma.user.update({ where: { id: user.id }, data: { is_verified: true } });
