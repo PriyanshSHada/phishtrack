@@ -25,12 +25,16 @@ exports.getWhoisData = async (urlStr) => {
     try {
       // 1. Try free REST API (bypasses Render Port 43 block)
       const res = await axios.get(`https://networkcalc.com/api/dns/whois/${domain}`, { timeout: 15000 });
-      if (res.data && res.data.status === 'OK' && res.data.whois && res.data.whois.record) {
-        rawData = res.data.whois.record;
+      if (res.data && res.data.status === 'OK' && res.data.whois) {
+        rawData = res.data.whois.record || JSON.stringify(res.data.whois);
         
-        // Networkcalc sometimes parses these out directly
-        if (res.data.whois.created) creationDateStr = res.data.whois.created;
-        if (res.data.whois.expires) expiryDateStr = res.data.whois.expires;
+        // Networkcalc parsed fields
+        if (res.data.whois.registry_created_date) creationDateStr = res.data.whois.registry_created_date;
+        else if (res.data.whois.created) creationDateStr = res.data.whois.created;
+        
+        if (res.data.whois.registry_expiration_date) expiryDateStr = res.data.whois.registry_expiration_date;
+        else if (res.data.whois.expires) expiryDateStr = res.data.whois.expires;
+        
         if (res.data.whois.registrar) registrarStr = res.data.whois.registrar;
         if (res.data.whois.registrant_country) countryStr = res.data.whois.registrant_country;
       } else {
