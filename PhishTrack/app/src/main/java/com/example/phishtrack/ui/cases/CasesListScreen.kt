@@ -17,6 +17,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -50,7 +51,13 @@ fun CasesListScreen(
     var sortBy by remember { mutableStateOf("Date") }
 
     var showDatePicker by remember { mutableStateOf(false) }
+    val sixMonthsAgo = remember {
+        java.util.Calendar.getInstance().apply {
+            add(java.util.Calendar.MONTH, -6)
+        }.timeInMillis
+    }
     val datePickerState = rememberDatePickerState(
+        initialDisplayedMonthMillis = sixMonthsAgo,
         selectableDates = object : SelectableDates {
             override fun isSelectableDate(utcTimeMillis: Long): Boolean {
                 return utcTimeMillis <= System.currentTimeMillis()
@@ -118,7 +125,8 @@ fun CasesListScreen(
     val filteredCases = remember(casesList, searchQuery, sortBy) {
         var list = casesList.filter { case ->
             case.caseNumber.contains(searchQuery, ignoreCase = true) ||
-            case.displayTarget().contains(searchQuery, ignoreCase = true)
+            case.displayTarget().contains(searchQuery, ignoreCase = true) ||
+            (case.title ?: "").contains(searchQuery, ignoreCase = true)
         }
         list = when (sortBy) {
             "Priority" -> {
@@ -134,7 +142,9 @@ fun CasesListScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0x0A, 0x0E, 0x1A))
+            .background(Brush.verticalGradient(
+                colors = listOf(Color(0xFF0F172A), Color(0xFF020617))
+            ))
             .padding(16.dp)
     ) {
         // Search + Refresh row

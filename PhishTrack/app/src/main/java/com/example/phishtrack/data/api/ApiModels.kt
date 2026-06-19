@@ -81,7 +81,7 @@ data class CaseResponse(
     val source: String,
     val priority: String,
     val status: String, // Open, Investigating, Closed
-    val tags: List<String>,
+    val tags: List<String> = emptyList(),
     @SerializedName("created_at") val createdAt: String,
     @SerializedName("updated_at") val updatedAt: String
 ) {
@@ -105,22 +105,22 @@ data class PaginatedCasesResponse(
 
 data class CaseDetailResponse(
     val id: String,
-    @SerializedName("case_number") val caseNumber: String,
-    val userId: String,
-    val title: String,
-    @SerializedName("target_type") val targetType: String = "URL",
+    @SerializedName("case_number") val caseNumber: String?,
+    val userId: String?,
+    val title: String?,
+    @SerializedName("target_type") val targetType: String? = "URL",
     val url: String? = null,
     @SerializedName("target_ip") val targetIp: String? = null,
     val description: String?,
-    val source: String,
-    val priority: String,
-    val status: String,
-    val tags: List<String>,
-    @SerializedName("created_at") val createdAt: String,
-    @SerializedName("updated_at") val updatedAt: String,
-    val analyses: List<AnalysisResponse> = emptyList(),
-    val reports: List<ReportResponse> = emptyList(),
-    val auditLogs: List<AuditLogResponse> = emptyList()
+    val source: String?,
+    val priority: String?,
+    val status: String?,
+    val tags: List<String> = emptyList(),
+    @SerializedName("created_at") val createdAt: String?,
+    @SerializedName("updated_at") val updatedAt: String?,
+    val analyses: List<AnalysisResponse>? = emptyList(),
+    val reports: List<ReportResponse>? = emptyList(),
+    val auditLogs: List<AuditLogResponse>? = emptyList()
 ) {
     fun displayTarget(): String = when (targetType) {
         "IP" -> targetIp ?: url.orEmpty()
@@ -149,19 +149,23 @@ data class RunAnalysisRequest(
 
 data class AnalysisResponse(
     val id: String,
-    val caseId: String,
+    val caseId: String?,
     @SerializedName("threat_score") val threatScore: Int?,
+    val confidence: Int? = 50,
     val severity: String?,
+    val verdict: String? = "Suspicious",
+    @SerializedName("brand_impersonated") val brandImpersonated: String? = null,
     @SerializedName("whois_data") val whoisData: JsonObject?,
     @SerializedName("ip_geolocation") val ipGeolocation: JsonObject?,
     @SerializedName("ssl_info") val sslInfo: JsonObject?,
-    @SerializedName("redirect_chain") val redirectChain: List<String>,
+    @SerializedName("redirect_chain") val redirectChain: List<String> = emptyList(),
     @SerializedName("virustotal_result") val virustotalResult: JsonObject?,
-    @SerializedName("page_screenshot") val pageScreenshot: String?, // Base64 representation
+    @SerializedName("page_screenshot") val pageScreenshot: String?,
     @SerializedName("page_source_hash") val pageSourceHash: String?,
     @SerializedName("ai_summary") val aiSummary: String?,
-    @SerializedName("ai_indicators") val aiIndicators: List<String>,
-    @SerializedName("ai_techniques") val aiTechniques: List<String>,
+    @SerializedName("ai_indicators") val aiIndicators: List<String> = emptyList(),
+    @SerializedName("ai_techniques") val aiTechniques: List<String> = emptyList(),
+    @SerializedName("mitre_techniques") val mitreTechniques: com.google.gson.JsonArray? = null,
     @SerializedName("analyzed_at") val analyzedAt: String?
 )
 
@@ -192,7 +196,7 @@ data class VerifyDetails(
 
 // --- Dashboard ---
 data class StatsResponse(
-    val users: Int,
+    @SerializedName("highRisk") val highRisk: Int,
     val cases: Int,
     val analyses: Int,
     val reports: Int
@@ -231,10 +235,10 @@ data class AuditLogResponse(
     val id: String,
     val userId: String?,
     val caseId: String?,
-    val action: String,
+    val action: String?,
     @SerializedName("ip_address") val ipAddress: String?,
     @SerializedName("device_id") val deviceId: String?,
-    val timestamp: String,
+    val timestamp: String?,
     val metadata: JsonObject?
 )
 

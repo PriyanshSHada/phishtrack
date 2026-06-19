@@ -25,6 +25,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -133,6 +134,9 @@ fun NewCaseScreen(
     }
 
     Scaffold(
+        modifier = Modifier.background(Brush.verticalGradient(
+            colors = listOf(Color(0xFF0F172A), Color(0xFF020617))
+        )),
         topBar = {
             TopAppBar(
                 title = {
@@ -154,12 +158,12 @@ fun NewCaseScreen(
                     )
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background,
+                    containerColor = Color.Transparent,
                     titleContentColor = Color.White
                 )
             )
         },
-        containerColor = MaterialTheme.colorScheme.background
+        containerColor = Color.Transparent
     ) { paddingValues ->
         Column(
             modifier = Modifier
@@ -382,7 +386,7 @@ fun NewCaseScreen(
                 modifier = Modifier.padding(bottom = 8.dp)
             )
 
-            val sources = listOf("Email", "WhatsApp", "SMS", "Other")
+            val sources = listOf("Email", "WhatsApp", "SMS", "Social_Media", "Other")
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)

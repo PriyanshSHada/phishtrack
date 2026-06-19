@@ -16,6 +16,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
@@ -98,7 +99,9 @@ fun LoginScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0x0A, 0x0E, 0x1A)) // #0A0E1A
+            .background(Brush.verticalGradient(
+                colors = listOf(Color(0xFF0F172A), Color(0xFF020617))
+            ))
             .padding(24.dp),
         contentAlignment = Alignment.Center
     ) {

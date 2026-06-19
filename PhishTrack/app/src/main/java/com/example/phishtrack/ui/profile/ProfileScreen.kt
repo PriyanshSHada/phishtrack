@@ -20,6 +20,7 @@ import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -52,6 +53,8 @@ fun ProfileScreen(
     var pinLockEnabled by remember { mutableStateOf(authRepository.isPinLockEnabled()) }
     var showPinDialog by remember { mutableStateOf(false) }
     var newPin by remember { mutableStateOf("") }
+    
+    val cases by casesRepository.cachedCasesFlow.collectAsState(initial = emptyList())
 
     if (showPinDialog) {
         AlertDialog(
@@ -112,7 +115,9 @@ fun ProfileScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color(0x0A, 0x0E, 0x1A))
+                .background(Brush.verticalGradient(
+                    colors = listOf(Color(0xFF0F172A), Color(0xFF020617))
+                ))
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
@@ -141,7 +146,33 @@ fun ProfileScreen(
             }
         }
 
-        Spacer(modifier = Modifier.height(32.dp))
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // Case Statistics Summary
+        Text(
+            text = "CASE STATISTICS",
+            color = Color(0x88, 0x92, 0xB0),
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 1.sp,
+            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
+        )
+        
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            val totalCases = cases.size
+            val closedCases = cases.count { it.status == "Closed" || it.status == "False_Positive" }
+            val highRiskCases = cases.count { it.priority == "Critical" || it.priority == "High" }
+            val highRiskRate = if (totalCases > 0) (highRiskCases * 100) / totalCases else 0
+
+            StatCard(title = "Total Cases", value = totalCases.toString(), modifier = Modifier.weight(1f))
+            StatCard(title = "Closed", value = closedCases.toString(), modifier = Modifier.weight(1f))
+            StatCard(title = "High Risk", value = "$highRiskRate%", valueColor = if (highRiskRate > 50) Color(0xFF, 0x3B, 0x3B) else Color(0x00, 0xF5, 0xFF), modifier = Modifier.weight(1f))
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
 
         // Settings Sections
         Text(
@@ -300,9 +331,26 @@ fun ProfileScreen(
             hostState = snackbarHostState,
             modifier = Modifier.align(Alignment.BottomCenter)
         )
+        }
+    }
+
+@Composable
+fun StatCard(title: String, value: String, valueColor: Color = Color.White, modifier: Modifier = Modifier) {
+    Card(
+        shape = RoundedCornerShape(10.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0x14, 0x18, 0x29)),
+        modifier = modifier.border(1.dp, Color(0x2A, 0x35, 0x58), RoundedCornerShape(10.dp))
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp).fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(text = title, color = Color(0x88, 0x92, 0xB0), fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(text = value, color = valueColor, fontSize = 20.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+        }
     }
 }
-
 @Composable
 fun ProfileCard(profile: UserProfile) {
     Box(

@@ -84,7 +84,10 @@ fun DashboardScreen(
     val weeklyGraphState by viewModel.weeklyGraphState
 
     Scaffold(
-        containerColor = Color(0x0A, 0x0E, 0x1A), // #0A0E1A
+        containerColor = Color.Transparent,
+        modifier = Modifier.background(Brush.verticalGradient(
+            colors = listOf(Color(0xFF0F172A), Color(0xFF020617))
+        )),
         floatingActionButton = {
             FloatingActionButton(
                 onClick = onNewCaseClick,
@@ -143,7 +146,7 @@ fun DashboardScreen(
                     ErrorStateComponent(message = errorMsg, onRetry = { viewModel.refresh() })
                 }
                 else -> {
-                    MetricsGrid(StatsResponse(0, 0, 0, 0))
+                    MetricsGrid(StatsResponse(highRisk = 0, cases = 0, analyses = 0, reports = 0))
                 }
             }
 
@@ -268,10 +271,10 @@ fun MetricsGrid(stats: StatsResponse) {
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        MetricCard(title = "Users", value = stats.users.toString(), color = Color(0x4A, 0x9E, 0xFF), modifier = Modifier.weight(1f))
+        MetricCard(title = "High Risk", value = stats.highRisk.toString(), color = Color(0xFF, 0x3B, 0x3B), modifier = Modifier.weight(1f))
         MetricCard(title = "Cases", value = stats.cases.toString(), color = Color(0x00, 0xF5, 0xFF), modifier = Modifier.weight(1f))
         MetricCard(title = "Scans", value = stats.analyses.toString(), color = Color(0x00, 0xFF, 0x88), modifier = Modifier.weight(1f))
-        MetricCard(title = "Reports", value = stats.reports.toString(), color = Color(0xFF, 0x3B, 0x3B), modifier = Modifier.weight(1f))
+        MetricCard(title = "Reports", value = stats.reports.toString(), color = Color(0xFF, 0xA5, 0x00), modifier = Modifier.weight(1f))
     }
 }
 
@@ -881,10 +884,20 @@ fun CaseItemCard(case: CaseResponse, onClick: () -> Unit) {
             ) {
                 Text(
                     text = case.caseNumber,
+                    color = Color(0x88, 0x92, 0xB0),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    fontFamily = FontFamily.Monospace
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = case.title,
                     color = Color.White,
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily.Monospace
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
                 )
                 
                 // Priority Badge
