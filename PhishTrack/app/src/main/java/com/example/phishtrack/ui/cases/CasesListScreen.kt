@@ -118,7 +118,7 @@ fun CasesListScreen(
     val filteredCases = remember(casesList, searchQuery, sortBy) {
         var list = casesList.filter { case ->
             case.caseNumber.contains(searchQuery, ignoreCase = true) ||
-            case.url.contains(searchQuery, ignoreCase = true)
+            case.displayTarget().contains(searchQuery, ignoreCase = true)
         }
         list = when (sortBy) {
             "Priority" -> {
@@ -145,7 +145,7 @@ fun CasesListScreen(
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
-                placeholder = { Text("Search by URL or Case Number...") },
+                placeholder = { Text("Search by URL, IP, or Case Number...") },
                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search", tint = Color(0x88, 0x92, 0xB0)) },
                 singleLine = true,
                 colors = OutlinedTextFieldDefaults.colors(

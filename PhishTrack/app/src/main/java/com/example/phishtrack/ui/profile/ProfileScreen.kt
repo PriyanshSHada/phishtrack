@@ -123,7 +123,7 @@ fun ProfileScreen(
         when (profileState) {
             is UiState.Success -> {
                 val profile = (profileState as UiState.Success).data
-                AnalystIdCard(profile)
+                ProfileCard(profile)
             }
             is UiState.Loading -> {
                 Box(
@@ -137,7 +137,7 @@ fun ProfileScreen(
                 }
             }
             else -> {
-                AnalystIdCard(UserProfile("N/A", "analyst@phishtrack.org", "Forensic Analyst", "SOC Operations", "analyst", "PSH-001"))
+                ProfileCard(UserProfile("N/A", "analyst@phishtrack.org", "Forensic Analyst", "SOC Operations", "analyst"))
             }
         }
 
@@ -246,7 +246,7 @@ fun ProfileScreen(
                                 val csv = StringBuilder()
                                 csv.append("ID,Case Number,URL,Source,Priority,Status,Created At\n")
                                 cases.forEach { c ->
-                                    csv.append("${c.id},${c.caseNumber},${c.url},${c.source},${c.priority},${c.status},${c.createdAt}\n")
+                                    csv.append("${c.id},${c.caseNumber},${c.displayTarget()},${c.source},${c.priority},${c.status},${c.createdAt}\n")
                                 }
                                 // Write CSV to cache file and share via FileProvider
                                 val file = File(context.cacheDir, "phishtrack_cases.csv")
@@ -304,7 +304,7 @@ fun ProfileScreen(
 }
 
 @Composable
-fun AnalystIdCard(profile: UserProfile) {
+fun ProfileCard(profile: UserProfile) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -351,7 +351,7 @@ fun AnalystIdCard(profile: UserProfile) {
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "Analyst ID: ${profile.analystId ?: "PSH-${profile.id.take(4).uppercase()}"}",
+                    text = profile.email,
                     color = Color(0x88, 0x92, 0xB0),
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Medium,

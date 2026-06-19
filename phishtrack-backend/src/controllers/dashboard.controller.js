@@ -88,6 +88,7 @@ exports.getThreatMap = async (req, res, next) => {
             id: true,
             case_number: true,
             url: true,
+            target_ip: true,
             priority: true
           }
         }
@@ -106,7 +107,7 @@ exports.getThreatMap = async (req, res, next) => {
         severity: a.severity || 'Low',
         caseId: a.case.id,
         case_number: a.case.case_number,
-        url: a.case.url,
+        url: a.case.url || a.case.target_ip,
         priority: a.case.priority,
         ai_summary: a.ai_summary || null,
         ai_indicators: a.ai_indicators || [],

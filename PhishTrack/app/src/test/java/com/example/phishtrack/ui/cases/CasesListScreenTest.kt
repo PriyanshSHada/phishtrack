@@ -40,13 +40,15 @@ class CasesListScreenTest {
         status: String = "Open",
         priority: String = "Low"
     ) = CaseResponse(
-        id = id, caseNumber = caseNumber, userId = "u1", url = url,
+        id = id, caseNumber = caseNumber, userId = "u1", title = "Test Case",
+        targetType = "URL", url = url, targetIp = null,
         description = null, source = "Email", priority = priority,
         status = status, tags = emptyList(), createdAt = NOW, updatedAt = NOW
     )
 
     private fun makeEntity(case: CaseResponse) = CaseEntity(
-        id = case.id, caseNumber = case.caseNumber, userId = case.userId, url = case.url,
+        id = case.id, caseNumber = case.caseNumber, userId = case.userId, title = case.title,
+        targetType = case.targetType, url = case.displayTarget(), targetIp = case.targetIp,
         description = null, source = case.source, priority = case.priority,
         status = case.status, tags = "", createdAt = case.createdAt, updatedAt = case.updatedAt
     )

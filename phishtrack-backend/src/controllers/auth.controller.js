@@ -18,8 +18,7 @@ exports.register = async (req, res, next) => {
     res.status(201).json({
       id: user.id,
       email: user.email,
-      name: user.name,
-      analyst_id: user.analyst_id
+      name: user.name
     });
   } catch (err) {
     logger.error('Registration error', { error: err.message, stack: err.stack });
@@ -107,7 +106,6 @@ exports.me = async (req, res, next) => {
       email: user.email,
       name: user.name,
       organization: user.organization,
-      analystId: user.analyst_id,
       role: user.role
     });
   } catch (err) {

@@ -12,7 +12,6 @@ model User {
   name         String?
   email        String           @unique
   password     String
-  analyst_id   String?          @unique
   organization String?
   role         Role             @default(analyst)
   device_id    String?
@@ -30,7 +29,9 @@ model Case {
   case_number String           @unique
   userId      String
   title       String           @default("Untitled Case")
-  url         String
+  target_type TargetType       @default(URL)
+  url         String?
+  target_ip   String?
   description String?
   source      Source
   priority    Priority
@@ -107,6 +108,11 @@ model ChainOfCustody {
 enum Role {
   analyst
   admin
+}
+
+enum TargetType {
+  URL
+  IP
 }
 
 enum Source {

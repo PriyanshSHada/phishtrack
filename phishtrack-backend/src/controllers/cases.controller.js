@@ -4,7 +4,7 @@ const { generateCaseNumber } = require('../utils/caseNumber.util');
 exports.getAllCases = async (req, res, next) => {
   try {
     const { status, priority, date, page, limit } = req.query;
-    const where = {};
+    const where = { userId: req.user.userId };
     if (status) {
       if (status === 'Open') {
         where.status = { in: ['Open', 'Investigating'] };
@@ -54,15 +54,14 @@ exports.getAllCases = async (req, res, next) => {
 
 exports.createCase = async (req, res, next) => {
   try {
-    const { title, description, url, source, priority, tags } = req.body;
-    if (!url) return res.status(400).json({ error: 'Missing url' });
+    const { title, description, url, target_ip, target_type, source, priority, tags } = req.body;
+    const type = target_type || 'URL';
 
-    let userId = req.user?.userId;
-    if (!userId) {
-      const firstUser = await prisma.user.findFirst();
-      if (!firstUser) return res.status(400).json({ error: 'No user available to assign case' });
-      userId = firstUser.id;
-    }
+    const userId = req.user?.userId;
+    if (!userId) return res.status(401).json({ error: 'Authentication required' });
+
+    if (type === 'URL' && !url) return res.status(400).json({ error: 'Missing url' });
+    if (type === 'IP' && !target_ip) return res.status(400).json({ error: 'Missing target_ip' });
 
     // Wrap count + create in a transaction to prevent duplicate case numbers
     // under concurrent requests.
@@ -76,7 +75,9 @@ exports.createCase = async (req, res, next) => {
           case_number: caseNumber,
           userId,
           title: title || 'Untitled Case',
-          url: url || '',
+          target_type: type,
+          url: type === 'URL' ? url : null,
+          target_ip: type === 'IP' ? target_ip.trim() : null,
           description: description || '',
           source: source || 'Other',
           priority: priority || 'Low',

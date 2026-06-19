@@ -2,8 +2,7 @@ package com.example.phishtrack
 
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.*
 import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation3.runtime.NavKey
@@ -130,16 +129,19 @@ fun MainNavigation(
         NewCase -> {
           val coroutineScope = rememberCoroutineScope()
           val context = LocalContext.current
+          var submitResetTrigger by remember { mutableIntStateOf(0) }
           NewCaseScreen(
+              submitResetTrigger = submitResetTrigger,
               onBackClick = { backStack.removeLastOrNull() },
-              onSubmitCase = { title, url, desc, src, priority, tags ->
+              onSubmitCase = { title, targetType, url, targetIp, desc, src, priority, tags ->
                   coroutineScope.launch {
-                      casesRepository.createCase(title, url, desc, src, priority, tags).collect { result ->
+                      casesRepository.createCase(title, targetType, url, targetIp, desc, src, priority, tags).collect { result ->
                           result.fold(
                               onSuccess = { caseResponse ->
                                   backStack.replaceTop(AnalysisLoading(caseId = caseResponse.id))
                               },
                               onFailure = { err ->
+                                  submitResetTrigger++
                                   Toast.makeText(context, "Failed to create case: ${err.message}", Toast.LENGTH_LONG).show()
                               }
                           )

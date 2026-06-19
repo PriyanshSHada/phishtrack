@@ -284,7 +284,7 @@ fun ReportScreen(
                         Column(modifier = Modifier.padding(16.dp)) {
                             Text(text = "CASE: ${detail.caseNumber}", color = Color.White, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, fontSize = 16.sp)
                             Spacer(modifier = Modifier.height(4.dp))
-                            Text(text = "Target URL: ${detail.url}", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
+                            Text(text = "Target: ${detail.displayTarget()}", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
                             Spacer(modifier = Modifier.height(16.dp))
                             Text(text = "UPDATE STATUS", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                             Spacer(modifier = Modifier.height(8.dp))

@@ -68,10 +68,12 @@ fun RequiredLabel(text: String) {
 @Composable
 fun NewCaseScreen(
     onBackClick: () -> Unit,
-    onSubmitCase: (title: String, url: String, description: String?, source: String, priority: String, tags: List<String>) -> Unit
+    onSubmitCase: (title: String, targetType: String, url: String?, targetIp: String?, description: String?, source: String, priority: String, tags: List<String>) -> Unit,
+    submitResetTrigger: Int = 0
 ) {
     var title by remember { mutableStateOf("") }
-    var url by remember { mutableStateOf("") }
+    var targetInput by remember { mutableStateOf("") }
+    var selectedTargetType by remember { mutableStateOf("URL") }
     var description by remember { mutableStateOf("") }
     var selectedSource by remember { mutableStateOf("Email") }
     var selectedPriority by remember { mutableStateOf("High") }
@@ -84,14 +86,24 @@ fun NewCaseScreen(
     val focusManager = LocalFocusManager.current
     val haptic = LocalHapticFeedback.current
 
+    LaunchedEffect(submitResetTrigger) {
+        if (submitResetTrigger > 0) isSubmitting = false
+    }
+
     val urlFocusRequester = remember { FocusRequester() }
     val descFocusRequester = remember { FocusRequester() }
     val tagsFocusRequester = remember { FocusRequester() }
 
     val maxDescLength = 500
+    val ipv4Regex = remember { Regex("""^(?:(?:25[0-5]|2[0-4]\d|[01]?\d?\d?)\.){3}(?:25[0-5]|2[0-4]\d|[01]?\d?\d?)$""") }
 
-    val isValidUrl = url.trim().isNotEmpty() && (url.trim().startsWith("http://") || url.trim().startsWith("https://"))
-    val isUrlError = (url.isNotEmpty() || hasAttemptedSubmit) && !isValidUrl
+    val trimmedTarget = targetInput.trim()
+    val isValidTarget = if (selectedTargetType == "URL") {
+        trimmedTarget.isNotEmpty() && (trimmedTarget.startsWith("http://") || trimmedTarget.startsWith("https://"))
+    } else {
+        trimmedTarget.isNotEmpty() && ipv4Regex.matches(trimmedTarget)
+    }
+    val isTargetError = (targetInput.isNotEmpty() || hasAttemptedSubmit) && !isValidTarget
 
     val isValidTitle = title.trim().isNotEmpty()
     val isTitleError = hasAttemptedSubmit && !isValidTitle
@@ -99,7 +111,7 @@ fun NewCaseScreen(
     val isValidDesc = description.trim().isNotEmpty() && description.length <= maxDescLength
     val isDescError = (hasAttemptedSubmit && description.trim().isEmpty()) || description.length > maxDescLength
 
-    val canSubmit = isValidUrl && isValidTitle && isValidDesc && !isSubmitting
+    val canSubmit = isValidTarget && isValidTitle && isValidDesc && !isSubmitting
 
     val submitInteractionSource = remember { MutableInteractionSource() }
     val isSubmitPressed by submitInteractionSource.collectIsPressedAsState()
@@ -112,7 +124,9 @@ fun NewCaseScreen(
             isSubmitting = true
             val tagsList = if (tagsInput.trim().isEmpty()) emptyList() else tagsInput.split(",").map { it.trim() }.filter { it.isNotEmpty() }
             val finalDescription = description.trim().ifEmpty { null }
-            onSubmitCase(title.trim(), url.trim(), finalDescription, selectedSource, selectedPriority, tagsList)
+            val url = if (selectedTargetType == "URL") trimmedTarget else null
+            val targetIp = if (selectedTargetType == "IP") trimmedTarget else null
+            onSubmitCase(title.trim(), selectedTargetType, url, targetIp, finalDescription, selectedSource, selectedPriority, tagsList)
         } else {
             haptic.performHapticFeedback(HapticFeedbackType.LongPress) // Error feedback
         }
@@ -192,13 +206,62 @@ fun NewCaseScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // URL input with Paste button
+            Text(
+                text = "TARGET TYPE",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 1.sp,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+
+            val targetTypes = listOf("URL", "IP")
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                targetTypes.forEach { type ->
+                    val isSelected = selectedTargetType == type
+                    Box(
+                        modifier = Modifier
+                            .background(
+                                color = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.2f) else MaterialTheme.colorScheme.surface,
+                                shape = RoundedCornerShape(8.dp)
+                            )
+                            .border(
+                                width = if (isSelected) 2.dp else 1.dp,
+                                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                                shape = RoundedCornerShape(8.dp)
+                            )
+                            .clickable {
+                                selectedTargetType = type
+                                targetInput = ""
+                                hasAttemptedSubmit = false
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            }
+                            .padding(horizontal = 14.dp, vertical = 10.dp)
+                            .weight(1f),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = type,
+                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // URL or IP input with Paste button
             OutlinedTextField(
-                value = url,
-                onValueChange = { url = it; hasAttemptedSubmit = false },
-                label = { RequiredLabel("Target Phishing URL") },
-                placeholder = { Text("https://example-scam-site.com") },
-                leadingIcon = { Icon(Icons.Default.Link, contentDescription = "Link", tint = MaterialTheme.colorScheme.onSurfaceVariant) },
+                value = targetInput,
+                onValueChange = { targetInput = it; hasAttemptedSubmit = false },
+                label = { RequiredLabel(if (selectedTargetType == "URL") "Target Phishing URL" else "Target IP Address") },
+                placeholder = { Text(if (selectedTargetType == "URL") "https://example-scam-site.com" else "192.168.1.1") },
+                leadingIcon = { Icon(Icons.Default.Link, contentDescription = "Target", tint = MaterialTheme.colorScheme.onSurfaceVariant) },
                 trailingIcon = {
                     IconButton(onClick = {
                         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
@@ -206,7 +269,7 @@ fun NewCaseScreen(
                         if (clip != null && clip.itemCount > 0) {
                             val text = clip.getItemAt(0).text
                             if (!text.isNullOrEmpty()) {
-                                url = text.toString()
+                                targetInput = text.toString()
                                 hasAttemptedSubmit = false
                                 Toast.makeText(context, "Pasted from clipboard", Toast.LENGTH_SHORT).show()
                             }
@@ -216,15 +279,19 @@ fun NewCaseScreen(
                     }
                 },
                 singleLine = true,
-                isError = isUrlError,
+                isError = isTargetError,
                 supportingText = {
                     AnimatedVisibility(
-                        visible = isUrlError,
+                        visible = isTargetError,
                         enter = fadeIn() + expandVertically(),
                         exit = fadeOut() + shrinkVertically()
                     ) {
                         Text(
-                            if (url.isEmpty()) "URL is required" else "Enter a valid URL starting with https://",
+                            when {
+                                targetInput.isEmpty() -> if (selectedTargetType == "URL") "URL is required" else "IP address is required"
+                                selectedTargetType == "URL" -> "Enter a valid URL starting with https://"
+                                else -> "Enter a valid IPv4 address (e.g. 192.168.1.1)"
+                            },
                             color = MaterialTheme.colorScheme.error
                         )
                     }
@@ -459,7 +526,7 @@ fun NewCaseScreen(
                         )
                     } else {
                         Text(
-                            text = "ANALYZE LINK SAFELY",
+                            text = if (selectedTargetType == "URL") "ANALYZE LINK SAFELY" else "ANALYZE IP SAFELY",
                             color = if (canSubmit) MaterialTheme.colorScheme.background else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
                             fontWeight = FontWeight.Bold,
                             fontSize = 15.sp,

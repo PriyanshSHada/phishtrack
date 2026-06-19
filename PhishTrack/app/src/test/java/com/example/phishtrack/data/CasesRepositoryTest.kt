@@ -28,13 +28,15 @@ class CasesRepositoryTest {
     private val NOW = "2026-06-17T00:00:00.000Z"
 
     private fun fakeEntity(id: String = "id-1", tags: String = "") = CaseEntity(
-        id = id, caseNumber = "CASE-2026-001", userId = "u1", url = "https://example.com",
+        id = id, caseNumber = "CASE-2026-001", userId = "u1", title = "Test Case",
+        targetType = "URL", url = "https://example.com", targetIp = null,
         description = null, source = "Email", priority = "High", status = "Open",
         tags = tags, createdAt = NOW, updatedAt = NOW
     )
 
     private fun fakeResponse(id: String = "id-1", tags: List<String> = emptyList()) = CaseResponse(
-        id = id, caseNumber = "CASE-2026-001", userId = "u1", url = "https://example.com",
+        id = id, caseNumber = "CASE-2026-001", userId = "u1", title = "Test Case",
+        targetType = "URL", url = "https://example.com", targetIp = null,
         description = null, source = "Email", priority = "High", status = "Open",
         tags = tags, createdAt = NOW, updatedAt = NOW
     )
@@ -94,7 +96,7 @@ class CasesRepositoryTest {
         val response = fakeResponse(tags = listOf("phishing"))
         coEvery { apiService.createCase(any()) } returns response
 
-        repo.createCase("https://example.com", null, "Email", "High", listOf("phishing")).test {
+        repo.createCase("Test Case", "URL", "https://example.com", null, null, "Email", "High", listOf("phishing")).test {
             val result = awaitItem()
             assertTrue(result.isSuccess)
             awaitComplete()
@@ -107,7 +109,7 @@ class CasesRepositoryTest {
     fun `A28 - createCase network failure does not touch DAO and emits Result-failure`() = runTest {
         coEvery { apiService.createCase(any()) } throws RuntimeException("Server error")
 
-        repo.createCase("https://example.com", null, "Email", "Low", emptyList()).test {
+        repo.createCase("Test Case", "URL", "https://example.com", null, null, "Email", "Low", emptyList()).test {
             val result = awaitItem()
             assertTrue(result.isFailure)
             awaitComplete()

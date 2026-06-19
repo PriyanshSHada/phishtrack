@@ -29,11 +29,31 @@ describe('Cases Routes — Integration', () => {
       const res = await request(app)
         .post('/api/cases')
         .set(authHeader())
-        .send({ url: 'https://phish.example.com', priority: 'High', source: 'Email' });
+        .send({ title: 'Phish Test', url: 'https://phish.example.com', priority: 'High', source: 'Email' });
 
       expect(res.statusCode).toBe(201);
       expect(res.body.case_number).toMatch(/^CASE-\d{4}-\d{3,}/);
       expect(res.body.url).toBe('https://phish.example.com');
+      expect(res.body.title).toBe('Phish Test');
+      expect(res.body.target_type).toBe('URL');
+    });
+
+    test('I16b — IP target case returns 201 with target_ip', async () => {
+      const res = await request(app)
+        .post('/api/cases')
+        .set(authHeader())
+        .send({
+          title: 'Suspicious IP',
+          target_type: 'IP',
+          target_ip: '8.8.8.8',
+          priority: 'High',
+          source: 'Email'
+        });
+
+      expect(res.statusCode).toBe(201);
+      expect(res.body.target_type).toBe('IP');
+      expect(res.body.target_ip).toBe('8.8.8.8');
+      expect(res.body.url).toBeNull();
     });
 
     test('I17 — missing URL returns 400', async () => {

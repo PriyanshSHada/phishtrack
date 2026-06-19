@@ -28,7 +28,9 @@ class CasesRepository @Inject constructor(
                 caseNumber = entity.caseNumber,
                 userId = entity.userId,
                 title = entity.title,
-                url = entity.url,
+                targetType = entity.targetType,
+                url = entity.url.ifEmpty { null },
+                targetIp = entity.targetIp,
                 description = entity.description,
                 source = entity.source,
                 priority = entity.priority,
@@ -51,7 +53,9 @@ class CasesRepository @Inject constructor(
                     caseNumber = case.caseNumber,
                     userId = case.userId,
                     title = case.title,
-                    url = case.url,
+                    targetType = case.targetType,
+                    url = case.displayTarget(),
+                    targetIp = case.targetIp,
                     description = case.description,
                     source = case.source,
                     priority = case.priority,
@@ -92,9 +96,20 @@ class CasesRepository @Inject constructor(
         }
     }
 
-    fun createCase(title: String, url: String, desc: String?, source: String, priority: String, tags: List<String>): Flow<Result<CaseResponse>> = flow {
+    fun createCase(
+        title: String,
+        targetType: String,
+        url: String?,
+        targetIp: String?,
+        desc: String?,
+        source: String,
+        priority: String,
+        tags: List<String>
+    ): Flow<Result<CaseResponse>> = flow {
         try {
-            val response = apiService.createCase(CreateCaseRequest(title, url, desc, source, priority, tags))
+            val response = apiService.createCase(
+                CreateCaseRequest(title, targetType, url, targetIp, desc, source, priority, tags)
+            )
             // Insert created case locally
             caseDao.insertCase(
                 CaseEntity(
@@ -102,7 +117,9 @@ class CasesRepository @Inject constructor(
                     caseNumber = response.caseNumber,
                     userId = response.userId,
                     title = response.title,
-                    url = response.url,
+                    targetType = response.targetType,
+                    url = response.displayTarget(),
+                    targetIp = response.targetIp,
                     description = response.description,
                     source = response.source,
                     priority = response.priority,

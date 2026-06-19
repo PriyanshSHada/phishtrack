@@ -604,7 +604,7 @@ private fun ThreatOverlay(threat: ThreatLocation, onDismiss: () -> Unit) {
                 )
                 Spacer(modifier = Modifier.height(3.dp))
                 Text(
-                    text = threat.url ?: "No URL",
+                    text = threat.url ?: threat.ip ?: "No target",
                     color = Color(0x00, 0xF5, 0xFF),
                     fontSize = 12.sp,
                     maxLines = 1,
@@ -905,9 +905,8 @@ fun CaseItemCard(case: CaseResponse, onClick: () -> Unit) {
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // URL Label
             Text(
-                text = case.url,
+                text = case.displayTarget(),
                 color = Color(0x88, 0x92, 0xB0),
                 fontSize = 13.sp,
                 maxLines = 1,

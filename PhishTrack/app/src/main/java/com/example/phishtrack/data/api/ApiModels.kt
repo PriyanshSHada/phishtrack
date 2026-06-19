@@ -14,8 +14,7 @@ data class RegisterRequest(
 data class RegisterResponse(
     val id: String,
     val email: String,
-    val name: String?,
-    @SerializedName("analyst_id") val analystId: String?
+    val name: String?
 )
 
 data class LoginRequest(
@@ -55,14 +54,15 @@ data class UserProfile(
     val email: String,
     val name: String? = null,
     val organization: String? = null,
-    val role: String? = null,
-    @SerializedName("analyst_id") val analystId: String? = null
+    val role: String? = null
 )
 
 // --- Cases ---
 data class CreateCaseRequest(
     val title: String,
-    val url: String,
+    @SerializedName("target_type") val targetType: String = "URL",
+    val url: String? = null,
+    @SerializedName("target_ip") val targetIp: String? = null,
     val description: String? = null,
     val source: String, // WhatsApp, Email, SMS, Other
     val priority: String, // Low, Medium, High, Critical
@@ -74,7 +74,9 @@ data class CaseResponse(
     @SerializedName("case_number") val caseNumber: String,
     val userId: String,
     val title: String,
-    val url: String,
+    @SerializedName("target_type") val targetType: String = "URL",
+    val url: String? = null,
+    @SerializedName("target_ip") val targetIp: String? = null,
     val description: String?,
     val source: String,
     val priority: String,
@@ -82,7 +84,12 @@ data class CaseResponse(
     val tags: List<String>,
     @SerializedName("created_at") val createdAt: String,
     @SerializedName("updated_at") val updatedAt: String
-)
+) {
+    fun displayTarget(): String = when (targetType) {
+        "IP" -> targetIp ?: url.orEmpty()
+        else -> url ?: targetIp.orEmpty()
+    }
+}
 
 data class PaginationInfo(
     val page: Int,
@@ -101,7 +108,9 @@ data class CaseDetailResponse(
     @SerializedName("case_number") val caseNumber: String,
     val userId: String,
     val title: String,
-    val url: String,
+    @SerializedName("target_type") val targetType: String = "URL",
+    val url: String? = null,
+    @SerializedName("target_ip") val targetIp: String? = null,
     val description: String?,
     val source: String,
     val priority: String,
@@ -112,7 +121,12 @@ data class CaseDetailResponse(
     val analyses: List<AnalysisResponse> = emptyList(),
     val reports: List<ReportResponse> = emptyList(),
     val auditLogs: List<AuditLogResponse> = emptyList()
-)
+) {
+    fun displayTarget(): String = when (targetType) {
+        "IP" -> targetIp ?: url.orEmpty()
+        else -> url ?: targetIp.orEmpty()
+    }
+}
 
 data class UpdateCaseRequest(
     val status: String? = null,

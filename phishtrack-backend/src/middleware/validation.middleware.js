@@ -54,12 +54,31 @@ const resendOtpSchema = z.object({
 
 // ---- Case Schemas ----
 
+const ipv4Regex = /^(?:(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(?:25[0-5]|2[0-4]\d|[01]?\d\d?)$/;
+const ipv6Regex = /^([0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F]{0,4}$/;
+
+function isValidIp(value) {
+  return ipv4Regex.test(value) || ipv6Regex.test(value);
+}
+
 const createCaseSchema = z.object({
-  url: z.string().min(1, 'URL is required').max(2048, 'URL is too long'),
+  title: z.string().min(1, 'Title is required').max(200).optional().default('Untitled Case'),
+  target_type: z.enum(['URL', 'IP']).optional().default('URL'),
+  url: z.string().max(2048, 'URL is too long').optional(),
+  target_ip: z.string().max(45).optional(),
   description: z.string().max(5000).optional().default(''),
   source: z.enum(['WhatsApp', 'Email', 'SMS', 'Other']).optional().default('Other'),
   priority: z.enum(['Low', 'Medium', 'High', 'Critical']).optional().default('Low'),
   tags: z.array(z.string().max(50)).max(10).optional().default([])
+}).superRefine((data, ctx) => {
+  const type = data.target_type || 'URL';
+  if (type === 'URL') {
+    if (!data.url || data.url.trim().length === 0) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'URL is required for URL cases', path: ['url'] });
+    }
+  } else if (!data.target_ip || !isValidIp(data.target_ip.trim())) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Valid IP address is required for IP cases', path: ['target_ip'] });
+  }
 });
 
 const updateCaseSchema = z.object({

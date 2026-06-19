@@ -18,48 +18,68 @@ exports.runAnalysis = async (req, res, next) => {
     if (!c) return res.status(404).json({ error: 'Case not found' });
     if (c.userId !== req.user.userId) return res.status(403).json({ error: 'Access denied' });
 
-    const url = c.url || 'http://example.com';
+    const isIpCase = c.target_type === 'IP';
+    const targetIp = c.target_ip;
+    const url = c.url || (targetIp ? `http://${targetIp}` : 'http://example.com');
 
-    // Run parallel checks
-    const [
-      whoisResult,
-      ipgeoResult,
-      sslResult,
-      virustotalResult,
-      similarityResult,
-      homographResult,
-      sandboxResult
-    ] = await Promise.allSettled([
-      whoisService.getWhoisData(url),
-      ipgeoService.getIpGeoData(url),
-      sslService.getSslInfo(url),
-      virustotalService.getVirusTotalResult(url),
-      domainCheckService.checkSimilarity(url),
-      homographService.detectHomographAttack(url),
-      puppeteerService.runSandbox(url)
-    ]);
+    let whois = null;
+    let ipGeo = null;
+    let ssl = { valid: false, error: 'SSL check skipped for IP-only case' };
+    let virustotal = null;
+    let similarity = null;
+    let homograph = null;
+    let sandbox = {};
 
-    const whois = whoisResult.status === 'fulfilled' && !whoisResult.value?.error ? whoisResult.value : null;
-    const ipGeo = ipgeoResult.status === 'fulfilled' && ipgeoResult.value !== null ? ipgeoResult.value : null;
-    const ssl = sslResult.status === 'fulfilled' ? sslResult.value : { valid: false, error: 'SSL check failed' };
-    const virustotal = virustotalResult.status === 'fulfilled' ? virustotalResult.value : null;
-    const similarity = similarityResult.status === 'fulfilled' ? similarityResult.value : null;
-    const homograph = homographResult.status === 'fulfilled' ? homographResult.value : null;
-    const sandbox = sandboxResult.status === 'fulfilled' ? sandboxResult.value : {};
+    if (isIpCase && targetIp) {
+      const [ipgeoResult, virustotalResult, sandboxResult] = await Promise.allSettled([
+        ipgeoService.getIpGeoDataFromIp(targetIp),
+        virustotalService.getVirusTotalIpResult(targetIp),
+        puppeteerService.runSandbox(url)
+      ]);
 
-    // Format results to run GPT analysis
+      ipGeo = ipgeoResult.status === 'fulfilled' && ipgeoResult.value !== null ? ipgeoResult.value : null;
+      virustotal = virustotalResult.status === 'fulfilled' ? virustotalResult.value : null;
+      sandbox = sandboxResult.status === 'fulfilled' ? sandboxResult.value : {};
+    } else {
+      const [
+        whoisResult,
+        ipgeoResult,
+        sslResult,
+        virustotalResult,
+        similarityResult,
+        homographResult,
+        sandboxResult
+      ] = await Promise.allSettled([
+        whoisService.getWhoisData(url),
+        ipgeoService.getIpGeoData(url),
+        sslService.getSslInfo(url),
+        virustotalService.getVirusTotalResult(url),
+        domainCheckService.checkSimilarity(url),
+        homographService.detectHomographAttack(url),
+        puppeteerService.runSandbox(url)
+      ]);
+
+      whois = whoisResult.status === 'fulfilled' && !whoisResult.value?.error ? whoisResult.value : null;
+      ipGeo = ipgeoResult.status === 'fulfilled' && ipgeoResult.value !== null ? ipgeoResult.value : null;
+      ssl = sslResult.status === 'fulfilled' ? sslResult.value : { valid: false, error: 'SSL check failed' };
+      virustotal = virustotalResult.status === 'fulfilled' ? virustotalResult.value : null;
+      similarity = similarityResult.status === 'fulfilled' ? similarityResult.value : null;
+      homograph = homographResult.status === 'fulfilled' ? homographResult.value : null;
+      sandbox = sandboxResult.status === 'fulfilled' ? sandboxResult.value : {};
+    }
+
     const analysisData = {
-      url,
+      url: isIpCase ? targetIp : url,
+      targetType: c.target_type,
       whois,
       ipGeo,
       ssl,
       virustotal,
       similarity,
       homograph,
-      redirectChain: sandbox.redirectChain || [url]
+      redirectChain: sandbox.redirectChain || [isIpCase ? targetIp : url]
     };
 
-    // AI Analysis
     const aiResult = await openaiService.analyzeWithAi(analysisData);
 
     const severityMap = {
@@ -71,7 +91,6 @@ exports.runAnalysis = async (req, res, next) => {
     const rawSeverity = String(aiResult.severity).toLowerCase();
     const severity = severityMap[rawSeverity] || 'Low';
 
-    // Save to Database
     const analysis = await prisma.analysis.create({
       data: {
         caseId: c.id,
@@ -80,7 +99,7 @@ exports.runAnalysis = async (req, res, next) => {
         whois_data: whois,
         ip_geolocation: ipGeo,
         ssl_info: ssl,
-        redirect_chain: sandbox.redirectChain || [url],
+        redirect_chain: sandbox.redirectChain || [isIpCase ? targetIp : url],
         virustotal_result: virustotal,
         page_screenshot: sandbox.screenshot || null,
         page_source_hash: sandbox.pageSourceHash || null,
@@ -91,20 +110,18 @@ exports.runAnalysis = async (req, res, next) => {
       }
     });
 
-    // Update case status to Investigating
     await prisma.case.update({
       where: { id: c.id },
       data: { status: 'Investigating' }
     });
 
-    // Audit Log Case Analyzed
     await prisma.auditLog.create({
       data: {
         userId: req.user?.userId || c.userId,
         caseId: c.id,
         action: 'CASE_ANALYZED',
         ip_address: req.ip || null,
-        metadata: { threatScore: aiResult.threat_score, severity: severity }
+        metadata: { threatScore: aiResult.threat_score, severity: severity, targetType: c.target_type }
       }
     });
 
@@ -143,7 +160,7 @@ exports.getScreenshot = async (req, res, next) => {
       return res.status(404).json({ error: 'Screenshot not found' });
     }
     if (analysis.case.userId !== req.user.userId) return res.status(403).json({ error: 'Access denied' });
-    
+
     const screenshot = analysis.page_screenshot;
     if (screenshot.startsWith('data:image/png;base64,')) {
       const img = Buffer.from(screenshot.replace('data:image/png;base64,', ''), 'base64');
