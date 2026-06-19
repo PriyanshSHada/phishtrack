@@ -1,5 +1,4 @@
 const PDFDocument = require('pdfkit');
-const fs = require('fs');
 
 exports.generatePdfReport = (data) => {
   return new Promise((resolve, reject) => {
@@ -7,415 +6,496 @@ exports.generatePdfReport = (data) => {
       const doc = new PDFDocument({ margin: 50, size: 'A4', bufferPages: true });
       const buffers = [];
       doc.on('data', buffers.push.bind(buffers));
-      doc.on('end', () => {
-        const pdfData = Buffer.concat(buffers);
-        resolve(pdfData);
-      });
+      doc.on('end', () => resolve(Buffer.concat(buffers)));
 
-      // ── Professional Color Palette ──
-      const colors = {
-        dark: '#0A0E1A',
-        primary: '#141829',
-        accent: '#00F5FF',
-        danger: '#FF3B3B',
-        warning: '#FFA500',
-        success: '#00FF88',
-        text: '#1A1A2E',
-        subtext: '#555571',
-        muted: '#8892B0',
-        white: '#FFFFFF',
-        lightBg: '#F0F2FA',
-        border: '#D1D5DB',
+      // ── Color Palette (dark, professional forensics theme) ──
+      const c = {
+        dark:     '#0A0E1A',
+        navy:     '#141829',
+        card:     '#1A2035',
+        accent:   '#00F5FF',
+        danger:   '#FF3B3B',
+        warning:  '#FFA500',
+        success:  '#00CC66',
+        purple:   '#7C3AED',
+        white:    '#FFFFFF',
+        offwhite: '#E8EAF0',
+        muted:    '#8892B0',
+        subtle:   '#4A5270',
+        border:   '#2A3558',
+        lightBg:  '#F4F6FA',
+        textDark: '#1E2235',
       };
 
       const caseData = data.case || {};
       const analysis = data.analysis || {};
       const analyst = data.analyst || {};
       const score = analysis.threat_score || 0;
-      const severityColor =
-        score >= 70 ? colors.danger : score >= 40 ? colors.warning : colors.success;
+      const confidence = analysis.confidence || 50;
+      const verdict = analysis.verdict || 'Suspicious';
+      const brandImpersonated = analysis.brand_impersonated || null;
+      const mitreTechniques = (() => {
+        try {
+          if (Array.isArray(analysis.mitre_techniques)) return analysis.mitre_techniques;
+          if (analysis.mitre_techniques && typeof analysis.mitre_techniques === 'object') {
+            return Object.values(analysis.mitre_techniques);
+          }
+        } catch (_) {}
+        return [];
+      })();
 
-      // Helper: draw a gradient rectangle
-      function gradientRect(x, y, w, h) {
-        for (let i = 0; i < h; i++) {
-          const ratio = i / h;
-          doc.opacity(0.02 + ratio * 0.06)
-             .rect(x, y + i, w, 1)
-             .fill(colors.accent);
-        }
-        doc.opacity(1);
+      const severityColor = score >= 70 ? c.danger : score >= 40 ? c.warning : c.success;
+      const verdictColor = {
+        'Benign': c.success,
+        'Suspicious': c.warning,
+        'Likely Phishing': c.warning,
+        'Confirmed Phishing': c.danger,
+        'Malware Distribution': c.danger,
+        'Credential Harvesting': c.danger
+      }[verdict] || c.warning;
+
+      const W = 595.28; // A4 width in points
+      const MARGIN = 45;
+      const CONTENT_W = W - MARGIN * 2;
+
+      // ─── Helper functions ───────────────────────────────────────
+      function drawPageHeader(pageTitle) {
+        doc.rect(0, 0, W, 28).fill(c.dark);
+        doc.fillColor(c.accent).font('Helvetica-Bold').fontSize(8)
+           .text('PHISHTRACK', MARGIN, 9);
+        doc.fillColor(c.muted).font('Helvetica').fontSize(7)
+           .text(`${pageTitle}  |  CONFIDENTIAL FORENSIC DOCUMENT`, MARGIN + 80, 10);
+        doc.fillColor(c.subtle).font('Courier').fontSize(6)
+           .text(`CASE: ${caseData.case_number || 'N/A'}`, W - MARGIN - 110, 10);
       }
 
-      // ── COVER PAGE ──
-      // Background accent strips
-      doc.rect(0, 0, 8, 842).fill(severityColor);
-      doc.rect(0, 0, 595.28, 120).fill(colors.dark);
+      function sectionLabel(text, y) {
+        doc.rect(MARGIN, y, 3, 14).fill(c.accent);
+        doc.fillColor(c.textDark).font('Helvetica-Bold').fontSize(11)
+           .text(text, MARGIN + 10, y + 1);
+        return y + 22;
+      }
 
-      // Shield icon (text-based for simplicity)
-      doc.fillColor(colors.accent)
-         .font('Helvetica-Bold')
-         .fontSize(48)
-         .text('🛡️', 50, 25);
+      function infoRow(label, value, x, y, width = 200) {
+        doc.font('Helvetica-Bold').fontSize(8).fillColor(c.subtle).text(label, x, y);
+        doc.font('Helvetica').fontSize(9).fillColor(c.textDark).text(String(value || 'N/A'), x, y + 11, { width });
+        return y + 28;
+      }
 
-      // Title block
-      doc.fillColor(colors.white)
-         .font('Helvetica-Bold')
-         .fontSize(28)
-         .text('PHISHTRACK', 50, 35);
+      function pillBadge(text, x, y, bgColor, textColor) {
+        const pad = 8;
+        const pillW = Math.min(text.length * 5.5 + pad * 2, 160);
+        doc.rect(x, y, pillW, 14).fill(bgColor);
+        doc.fillColor(textColor || '#FFFFFF').font('Helvetica-Bold').fontSize(7)
+           .text(text.toUpperCase(), x + pad, y + 3, { width: pillW - pad * 2, align: 'center' });
+        return x + pillW + 6;
+      }
 
-      doc.fillColor(colors.muted)
-         .font('Helvetica')
-         .fontSize(12)
-         .text('FORENSIC ANALYSIS REPORT', 50, 68);
+      function drawTableHeader(headers, colWidths, x, y) {
+        doc.rect(x, y, colWidths.reduce((a, b) => a + b, 0), 16).fill(c.navy);
+        let cx = x;
+        headers.forEach((h, i) => {
+          doc.fillColor(c.accent).font('Helvetica-Bold').fontSize(7)
+             .text(h.toUpperCase(), cx + 4, y + 4, { width: colWidths[i] - 8 });
+          cx += colWidths[i];
+        });
+        return y + 16;
+      }
 
-      // Severity badge on cover
-      doc.rect(410, 30, 140, 50).fill(severityColor).opacity(0.12);
-      doc.opacity(1); // Reset opacity so subsequent content is not dimmed
-      doc.rect(410, 30, 140, 50).stroke(severityColor).lineWidth(1.5);
-      doc.fillColor(severityColor)
-         .font('Helvetica-Bold')
-         .fontSize(11)
-         .text('THREAT SCORE', 420, 38);
-      doc.fontSize(28)
-         .text(`${score}/100`, 420, 52);
+      function drawTableRow(cells, colWidths, x, y, rowIndex, cellColors) {
+        const rowH = 14;
+        const bgColor = rowIndex % 2 === 0 ? '#FFFFFF' : '#F7F8FB';
+        doc.rect(x, y, colWidths.reduce((a, b) => a + b, 0), rowH).fill(bgColor);
+        let cx = x;
+        cells.forEach((cell, i) => {
+          doc.fillColor(cellColors?.[i] || c.textDark).font('Helvetica').fontSize(7.5)
+             .text(String(cell || 'N/A'), cx + 4, y + 3, { width: colWidths[i] - 8, ellipsis: true });
+          cx += colWidths[i];
+        });
+        return y + rowH;
+      }
 
-      // Case metadata box
-      doc.rect(30, 180, 535, 160).fill(colors.lightBg);
-      doc.rect(30, 180, 535, 160).stroke(colors.border).lineWidth(0.5);
+      // ══════════════════════════════════════════════════════════
+      // PAGE 1: COVER
+      // ══════════════════════════════════════════════════════════
+      // Full dark header banner
+      doc.rect(0, 0, W, 130).fill(c.dark);
+      // Severity accent strip on left
+      doc.rect(0, 0, 6, 842).fill(severityColor);
 
-      doc.fillColor(colors.dark)
-         .font('Helvetica-Bold')
-         .fontSize(14)
-         .text('CASE DETAILS', 50, 195);
+      // Logo + title
+      doc.fillColor(c.white).font('Helvetica-Bold').fontSize(26)
+         .text('PHISHTRACK', MARGIN + 10, 28);
+      doc.fillColor(c.accent).font('Helvetica').fontSize(10).letterSpacing = 2;
+      doc.fillColor(c.accent).font('Helvetica').fontSize(10)
+         .text('FORENSIC CYBER INTELLIGENCE REPORT', MARGIN + 10, 58);
+      doc.fillColor(c.muted).font('Helvetica').fontSize(8)
+         .text('DIGITAL FORENSICS  |  THREAT ANALYSIS  |  CHAIN OF CUSTODY', MARGIN + 10, 75);
 
-      const leftX = 50;
-      const rightX = 320;
-      let y = 220;
+      // Threat score badge (top right)
+      const badgeX = W - 160;
+      doc.rect(badgeX, 20, 115, 90).fill(severityColor + '1A'); // 10% opacity
+      doc.rect(badgeX, 20, 115, 90).stroke(severityColor).lineWidth(1.5);
+      doc.fillColor(c.muted).font('Helvetica-Bold').fontSize(8).text('THREAT SCORE', badgeX + 10, 30);
+      doc.fillColor(severityColor).font('Helvetica-Bold').fontSize(40).text(`${score}`, badgeX + 12, 42);
+      doc.fillColor(c.muted).font('Helvetica').fontSize(8).text('/ 100', badgeX + 62, 68);
+      doc.fillColor(verdictColor).font('Helvetica-Bold').fontSize(9).text(verdict.toUpperCase(), badgeX + 10, 90);
 
-      const metaRows = [
-        ['Case Number:', caseData.case_number || 'N/A'],
-        ['Target URL:', caseData.url || 'N/A'],
-        ['Status:', caseData.status || 'N/A'],
-        ['Priority:', caseData.priority || 'N/A'],
-        ['Source:', caseData.source || 'N/A'],
-        ['Analyst:', analyst.name || 'System Assigned'],
-        ['Severity:', analysis.severity || 'Low'],
-        ['Date:', new Date(caseData.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })],
+      // Case info block
+      const infoY = 145;
+      doc.rect(MARGIN, infoY, CONTENT_W, 175).fill(c.lightBg);
+      doc.rect(MARGIN, infoY, CONTENT_W, 175).stroke('#D5D9E8').lineWidth(0.5);
+
+      doc.fillColor(c.textDark).font('Helvetica-Bold').fontSize(11).text('CASE OVERVIEW', MARGIN + 15, infoY + 12);
+      doc.rect(MARGIN + 15, infoY + 26, 80, 0.5).fill(c.accent);
+
+      const col1 = MARGIN + 15;
+      const col2 = MARGIN + 260;
+      let rowY = infoY + 35;
+
+      const leftMeta = [
+        ['Case Number', caseData.case_number || 'N/A'],
+        ['Case Title', caseData.title || 'Untitled Case'],
+        ['Target', caseData.url || caseData.target_ip || 'N/A'],
+        ['Target Type', caseData.target_type || 'URL'],
+      ];
+      const rightMeta = [
+        ['Priority', caseData.priority || 'N/A'],
+        ['Source', caseData.source || 'N/A'],
+        ['Status', caseData.status || 'N/A'],
+        ['Analyst', analyst.name || 'System'],
       ];
 
-      metaRows.forEach(([label, value], i) => {
-        const col = i < 4 ? leftX : rightX;
-        const rowY = y + (i % 4) * 30;
-        doc.font('Helvetica-Bold').fontSize(9).fillColor(colors.subtext).text(label, col, rowY);
-        doc.font('Helvetica').fontSize(10).fillColor(colors.text).text(String(value), col + 90, rowY);
+      leftMeta.forEach(([label, value], i) => {
+        doc.font('Helvetica-Bold').fontSize(8).fillColor(c.subtle).text(label + ':', col1, rowY + i * 32);
+        doc.font('Helvetica').fontSize(9).fillColor(c.textDark).text(String(value), col1, rowY + i * 32 + 11, { width: 220, ellipsis: true });
+      });
+      rightMeta.forEach(([label, value], i) => {
+        doc.font('Helvetica-Bold').fontSize(8).fillColor(c.subtle).text(label + ':', col2, rowY + i * 32);
+        doc.font('Helvetica').fontSize(9).fillColor(c.textDark).text(String(value), col2, rowY + i * 32 + 11, { width: 200 });
       });
 
-      // Threat gauge on cover
-      doc.fillColor(colors.dark)
-         .font('Helvetica-Bold')
-         .fontSize(11)
-         .text('RISK ASSESSMENT', 50, 370);
+      // Report metadata row
+      const metaY = infoY + 155;
+      doc.font('Helvetica').fontSize(7.5).fillColor(c.subtle)
+         .text(`Report v${data.version || 1}  |  Generated: ${new Date(data.generated_at).toUTCString()}  |  Analyst: ${analyst.email || 'N/A'}`, MARGIN + 15, metaY);
 
-      // Gauge bar
-      const gaugeY = 392;
-      doc.rect(50, gaugeY, 495, 18).fill('#E5E7EB').radius(4);
-      const fillWidth = Math.min(495, (score / 100) * 495);
-      doc.rect(50, gaugeY, fillWidth, 18).fill(severityColor).radius(4);
+      // Threat assessment bar
+      const barY = infoY + 205;
+      doc.fillColor(c.textDark).font('Helvetica-Bold').fontSize(10).text('RISK ASSESSMENT BAR', MARGIN, barY);
+      doc.roundedRect(MARGIN, barY + 18, CONTENT_W, 20, 4).fill('#E0E4EE');
+      doc.roundedRect(MARGIN, barY + 18, Math.max(0, (score / 100) * CONTENT_W), 20, 4).fill(severityColor);
+      doc.fillColor('#FFFFFF').font('Helvetica-Bold').fontSize(9)
+         .text(`${score}% THREAT CONFIDENCE`, MARGIN + 10, barY + 22);
 
-      doc.fillColor(colors.white)
-         .font('Helvetica-Bold')
-         .fontSize(10)
-         .text(`${score}%`, 290, gaugeY + 2);
+      // Severity + Verdict + Brand + Confidence chips
+      const chipY = barY + 48;
+      doc.fillColor(c.textDark).font('Helvetica-Bold').fontSize(9).text('CLASSIFICATION:', MARGIN, chipY);
+      let chipX = MARGIN + 100;
+      chipX = pillBadge(`Severity: ${analysis.severity || 'Low'}`, chipX, chipY - 1, severityColor, '#FFFFFF');
+      chipX = pillBadge(`Verdict: ${verdict}`, chipX, chipY - 1, verdictColor, '#FFFFFF');
+      chipX = pillBadge(`AI Confidence: ${confidence}%`, chipX, chipY - 1, c.purple, '#FFFFFF');
+      if (brandImpersonated) {
+        pillBadge(`Brand: ${brandImpersonated}`, chipX, chipY - 1, c.dark, c.accent);
+      }
 
-      // ── PAGE 2: AI ANALYSIS ──
+      // Created date
+      doc.fillColor(c.subtle).font('Helvetica').fontSize(8)
+         .text(`Case Created: ${new Date(caseData.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}`, MARGIN, chipY + 22);
+
+      // ══════════════════════════════════════════════════════════
+      // PAGE 2: AI FORENSIC ANALYSIS
+      // ══════════════════════════════════════════════════════════
       doc.addPage();
-      doc.rect(0, 0, 595.28, 20).fill(colors.dark);
+      drawPageHeader('AI FORENSIC ANALYSIS');
 
-      doc.fillColor(colors.dark)
-         .font('Helvetica-Bold')
-         .fontSize(16)
-         .text('AI FORENSIC ANALYSIS', 50, 35);
+      let y = 45;
 
-      // AI Summary box
-      const summaryText = analysis.ai_summary || 'No AI analysis available for this case.';
-      doc.rect(45, 60, 505, 100).fill(colors.lightBg);
-      doc.rect(45, 60, 505, 100).stroke(severityColor).lineWidth(1.5);
+      y = sectionLabel('AI FORENSIC EVALUATION SUMMARY', y);
 
-      doc.fillColor(colors.dark)
-         .font('Helvetica-Bold')
-         .fontSize(10)
-         .text('GPT-4o FORENSIC EVALUATION', 60, 70);
+      // Summary box with left accent bar
+      const summaryText = analysis.ai_summary || 'No AI analysis available.';
+      const summaryBoxH = Math.max(60, Math.ceil(summaryText.length / 80) * 14 + 20);
+      doc.rect(MARGIN, y, 3, summaryBoxH).fill(c.accent);
+      doc.rect(MARGIN + 3, y, CONTENT_W - 3, summaryBoxH).fill('#F0F4FF');
+      doc.rect(MARGIN, y, CONTENT_W, summaryBoxH).stroke(c.border).lineWidth(0.5);
+      doc.fillColor(c.textDark).font('Helvetica').fontSize(10)
+         .text(summaryText, MARGIN + 15, y + 10, { width: CONTENT_W - 25, align: 'justify', lineGap: 3 });
+      y += summaryBoxH + 20;
 
-      doc.font('Helvetica')
-         .fontSize(10)
-         .fillColor(colors.text)
-         .text(summaryText, 60, 88, { width: 475, align: 'justify', lineGap: 3 });
+      // Brand impersonation alert
+      if (brandImpersonated) {
+        doc.rect(MARGIN, y, CONTENT_W, 28).fill(c.danger + '18');
+        doc.rect(MARGIN, y, CONTENT_W, 28).stroke(c.danger).lineWidth(1);
+        doc.fillColor(c.danger).font('Helvetica-Bold').fontSize(9)
+           .text(`BRAND IMPERSONATION DETECTED: ${brandImpersonated.toUpperCase()}`, MARGIN + 10, y + 8);
+        doc.font('Helvetica').fontSize(8).fillColor(c.textDark)
+           .text('This site is impersonating a known brand. Users are likely being deceived.', MARGIN + 10, y + 18);
+        y += 38;
+      }
 
-      // Threat Indicators
-      let indicatorY = 175;
-      doc.fillColor(colors.dark)
-         .font('Helvetica-Bold')
-         .fontSize(14)
-         .text('THREAT INDICATORS', 50, indicatorY);
-
+      // Threat indicators
+      y = sectionLabel('THREAT INDICATORS', y);
       const indicators = analysis.ai_indicators || [];
       if (indicators.length === 0) {
-        doc.font('Helvetica-Oblique').fontSize(10).fillColor(colors.subtext)
-           .text('No specific indicators were flagged.', 50, indicatorY + 25);
+        doc.font('Helvetica-Oblique').fontSize(9).fillColor(c.muted).text('No specific indicators flagged.', MARGIN, y);
+        y += 20;
       } else {
-        indicatorY += 30;
         indicators.forEach((ind, i) => {
-          const badgeY = indicatorY + Math.floor(i / 2) * 24;
-          const badgeX = 50 + (i % 2) * 270;
-          doc.rect(badgeX, badgeY, 250, 20).fill(colors.danger).opacity(0.08);
-          doc.rect(badgeX, badgeY, 250, 20).stroke(colors.danger).lineWidth(0.5).opacity(0.4);
-          doc.fillColor(colors.danger)
-             .font('Helvetica-Bold')
-             .fontSize(8)
-             .text(`⚠ ${ind}`, badgeX + 8, badgeY + 5, { width: 234 });
-          doc.opacity(1);
+          const bx = MARGIN + (i % 2) * (CONTENT_W / 2 + 5);
+          const by = y + Math.floor(i / 2) * 22;
+          doc.rect(bx, by, CONTENT_W / 2 - 5, 18).fill(c.danger + '12');
+          doc.rect(bx, by, CONTENT_W / 2 - 5, 18).stroke(c.danger + '55').lineWidth(0.5);
+          doc.fillColor(c.danger).font('Helvetica-Bold').fontSize(7)
+             .text(`! ${ind}`, bx + 6, by + 4, { width: CONTENT_W / 2 - 18 });
         });
+        y += Math.ceil(indicators.length / 2) * 22 + 12;
       }
 
-      // Techniques
+      // Attack techniques
+      y = sectionLabel('DETECTED ATTACK TECHNIQUES', y);
       const techniques = analysis.ai_techniques || [];
-      let techY = indicators.length > 0 ? indicatorY + Math.ceil(indicators.length / 2) * 24 + 20 : indicatorY + 40;
-
-      if (techniques.length > 0) {
-        doc.fillColor(colors.dark)
-           .font('Helvetica-Bold')
-           .fontSize(14)
-           .text('DETECTED TECHNIQUES', 50, techY);
-
-        techY += 25;
+      if (techniques.length === 0) {
+        doc.font('Helvetica-Oblique').fontSize(9).fillColor(c.muted).text('No specific techniques identified.', MARGIN, y);
+        y += 20;
+      } else {
         techniques.forEach((tech, i) => {
-          doc.rect(50 + (i % 3) * 170, techY + Math.floor(i / 3) * 22, 155, 18)
-             .fill(colors.warning).opacity(0.08);
-          doc.fillColor(colors.warning)
-             .font('Helvetica')
-             .fontSize(8)
-             .text(`• ${tech}`, 58 + (i % 3) * 170, techY + Math.floor(i / 3) * 22 + 4, { width: 145 });
-          doc.opacity(1);
+          const tx = MARGIN + (i % 3) * (CONTENT_W / 3 + 2);
+          const ty = y + Math.floor(i / 3) * 22;
+          doc.rect(tx, ty, CONTENT_W / 3 - 4, 17).fill(c.warning + '15');
+          doc.fillColor(c.warning).font('Helvetica').fontSize(8)
+             .text(`• ${tech}`, tx + 6, ty + 4, { width: CONTENT_W / 3 - 16 });
         });
-        techY += Math.ceil(techniques.length / 3) * 22 + 20;
+        y += Math.ceil(techniques.length / 3) * 22 + 12;
       }
 
-      // ── PAGE 3: FORENSIC ARTIFACTS ──
+      // MITRE ATT&CK table
+      if (mitreTechniques.length > 0) {
+        y = sectionLabel('MITRE ATT&CK TECHNIQUE MAPPING', y);
+        const cols = [70, 200, 130, 105];
+        y = drawTableHeader(['ID', 'Technique', 'Tactic', 'Relevance'], cols, MARGIN, y);
+        mitreTechniques.forEach((m, i) => {
+          const tactic = m.tactic || 'Unknown';
+          y = drawTableRow(
+            [m.id || 'N/A', m.name || 'Unknown', tactic, 'Direct Match'],
+            cols, MARGIN, y, i,
+            [c.accent, c.textDark, c.purple, c.subtle]
+          );
+        });
+        y += 12;
+      }
+
+      // ══════════════════════════════════════════════════════════
+      // PAGE 3: FORENSIC ARTIFACTS
+      // ══════════════════════════════════════════════════════════
       doc.addPage();
-      doc.rect(0, 0, 595.28, 20).fill(colors.dark);
+      drawPageHeader('FORENSIC ARTIFACT ANALYSIS');
+      y = 45;
 
-      doc.fillColor(colors.dark)
-         .font('Helvetica-Bold')
-         .fontSize(16)
-         .text('FORENSIC ARTIFACT ANALYSIS', 50, 35);
-
-      // Section helper
-      function section(title, yStart) {
-        doc.rect(45, yStart - 5, 505, 1).fill(colors.accent).opacity(0.3);
-        doc.opacity(1);
-        doc.fillColor(colors.dark)
-           .font('Helvetica-Bold')
-           .fontSize(12)
-           .text(title, 50, yStart);
-        return yStart + 20;
-      }
-
-      let artY = 55;
-
-      // WHOIS Section
-      artY = section('WHOIS DOMAIN REGISTRY', artY);
+      // WHOIS
+      y = sectionLabel('WHOIS DOMAIN REGISTRY', y);
       const whois = analysis.whois_data || {};
-      const whoisData = [
-        ['Registrar', whois.registrar || 'Unknown'],
-        ['Country', whois.country || 'Unknown'],
-        ['Domain Age', whois.ageDays != null ? `${whois.ageDays} days` : 'Unknown'],
-        ['Creation Date', whois.creationDate ? new Date(whois.creationDate).toLocaleDateString() : 'Unknown'],
-        ['Expiry Date', whois.expiryDate ? new Date(whois.expiryDate).toLocaleDateString() : 'Unknown'],
-        ['Suspicious Age', whois.isSuspiciousAge ? 'YES ⚠' : 'No'],
+      const whoisRows = [
+        ['Registrar', whois.registrar],
+        ['Country', whois.country],
+        ['Domain Age', whois.ageDays != null ? `${whois.ageDays} days` : null],
+        ['Created', whois.creationDate ? new Date(whois.creationDate).toLocaleDateString() : null],
+        ['Expires', whois.expiryDate ? new Date(whois.expiryDate).toLocaleDateString() : null],
+        ['Suspicious Age', whois.isSuspiciousAge ? 'YES — HIGH RISK' : 'No'],
       ];
-      doc.font('Helvetica').fontSize(9);
-      whoisData.forEach(([label, value], i) => {
-        const rowX = 50 + (i % 2) * 270;
-        const rowY = artY + Math.floor(i / 2) * 16;
-        doc.fillColor(colors.subtext).text(label + ':', rowX, rowY);
-        doc.fillColor(colors.text).text(String(value), rowX + 90, rowY);
+      whoisRows.forEach(([label, value], i) => {
+        const wx = MARGIN + (i % 2) * (CONTENT_W / 2 + 5);
+        const wy = y + Math.floor(i / 2) * 30;
+        doc.font('Helvetica-Bold').fontSize(8).fillColor(c.subtle).text(label + ':', wx, wy);
+        const isRisk = label === 'Suspicious Age' && whois.isSuspiciousAge;
+        doc.font('Helvetica').fontSize(9).fillColor(isRisk ? c.danger : c.textDark)
+           .text(String(value || 'Unknown'), wx, wy + 11, { width: CONTENT_W / 2 - 10 });
       });
-      artY += Math.ceil(whoisData.length / 2) * 16 + 15;
+      y += Math.ceil(whoisRows.length / 2) * 30 + 15;
 
       // Network & SSL
-      artY = section('NETWORK & SSL DETAILS', artY);
+      y = sectionLabel('NETWORK & SSL DETAILS', y);
       const geo = analysis.ip_geolocation || {};
       const ssl = analysis.ssl_info || {};
-      const netData = [
-        ['Resolved IP', geo.ip || 'Unknown'],
+      const netRows = [
+        ['Resolved IP', geo.ip],
         ['Location', `${geo.city || '?'}, ${geo.country || '?'}`],
-        ['ISP', geo.isp || 'Unknown'],
-        ['SSL Valid', ssl.valid === true ? 'Yes ✅' : 'No ⚠'],
-        ['SSL Issuer', ssl.issuer || 'Unknown'],
+        ['ISP / Hosting', geo.isp],
+        ['SSL Valid', ssl.valid === true ? 'Valid (Secure)' : 'INVALID / Missing'],
+        ['SSL Issuer', ssl.issuer],
+        ['SSL Expiry', ssl.validTo ? ssl.validTo.toString().slice(0, 10) : null],
       ];
-      netData.forEach(([label, value], i) => {
-        const rowX = 50 + (i % 2) * 270;
-        const rowY = artY + Math.floor(i / 2) * 16;
-        doc.fillColor(colors.subtext).text(label + ':', rowX, rowY);
-        doc.fillColor(colors.text).text(String(value), rowX + 90, rowY);
+      netRows.forEach(([label, value], i) => {
+        const nx = MARGIN + (i % 2) * (CONTENT_W / 2 + 5);
+        const ny = y + Math.floor(i / 2) * 30;
+        doc.font('Helvetica-Bold').fontSize(8).fillColor(c.subtle).text(label + ':', nx, ny);
+        const isRisk = label === 'SSL Valid' && ssl.valid !== true;
+        doc.font('Helvetica').fontSize(9).fillColor(isRisk ? c.danger : c.textDark)
+           .text(String(value || 'Unknown'), nx, ny + 11, { width: CONTENT_W / 2 - 10 });
       });
-      artY += Math.ceil(netData.length / 2) * 16 + 15;
+      y += Math.ceil(netRows.length / 2) * 30 + 15;
 
       // VirusTotal
-      artY = section('VIRUSTOTAL SCAN RESULTS', artY);
+      y = sectionLabel('VIRUSTOTAL MULTI-ENGINE SCAN', y);
       const vt = analysis.virustotal_result || {};
-      doc.font('Helvetica').fontSize(10).fillColor(colors.text)
-         .text(`Malicious: ${vt.maliciousCount || 0}  |  Suspicious: ${vt.suspiciousCount || 0}  |  Harmless: ${vt.harmlessCount || 0}`, 50, artY);
-      artY += 25;
+      const malCount = vt.maliciousCount || 0;
+      const harmCount = vt.harmlessCount || 0;
+      const suspCount = vt.suspiciousCount || 0;
+      const totalEngines = vt.totalEngines || (malCount + harmCount + suspCount);
 
-      // Detections table
+      // Summary bar
+      doc.rect(MARGIN, y, CONTENT_W, 14).fill(c.lightBg);
+      if (totalEngines > 0) {
+        const malW = (malCount / totalEngines) * CONTENT_W;
+        const suspW = (suspCount / totalEngines) * CONTENT_W;
+        doc.rect(MARGIN, y, malW, 14).fill(c.danger);
+        doc.rect(MARGIN + malW, y, suspW, 14).fill(c.warning);
+      }
+      doc.fillColor(c.white).font('Helvetica-Bold').fontSize(7.5)
+         .text(`${malCount} Malicious  |  ${suspCount} Suspicious  |  ${harmCount} Harmless  |  Total: ${totalEngines} engines`, MARGIN + 8, y + 3);
+      y += 22;
+
       const detections = vt.detections || [];
       if (detections.length > 0) {
-        doc.font('Helvetica-Bold').fontSize(9).fillColor(colors.subtext)
-           .text('Engine', 55, artY)
-           .text('Result', 250, artY);
-        doc.moveTo(50, artY + 12).lineTo(545, artY + 12).stroke(colors.border).lineWidth(0.5);
-        artY += 16;
-        detections.slice(0, 8).forEach(d => {
-          doc.font('Helvetica').fontSize(8)
-             .fillColor(colors.text).text(d.engine, 55, artY)
-             .fillColor(colors.danger).text(String(d.result || ''), 250, artY, { width: 280 });
-          artY += 14;
+        const dcols = [170, 150, 185];
+        y = drawTableHeader(['Engine', 'Category', 'Result'], dcols, MARGIN, y);
+        detections.slice(0, 10).forEach((d, i) => {
+          const isMal = (d.result || '').toLowerCase().includes('phish') || (d.result || '').toLowerCase().includes('malware');
+          y = drawTableRow(
+            [d.engine || 'Unknown', d.category || 'malicious', d.result || 'flagged'],
+            dcols, MARGIN, y, i,
+            [c.textDark, c.textDark, isMal ? c.danger : c.warning]
+          );
         });
-        artY += 10;
+        if (detections.length > 10) {
+          doc.font('Helvetica-Oblique').fontSize(7.5).fillColor(c.muted)
+             .text(`+ ${detections.length - 10} more detections not shown`, MARGIN, y + 4);
+          y += 14;
+        }
+        y += 10;
+      } else {
+        doc.font('Helvetica').fontSize(9).fillColor(malCount > 0 ? c.danger : c.success)
+           .text(malCount > 0 ? `${malCount} detections flagged. No breakdown available.` : 'No detections found by any engine.', MARGIN, y);
+        y += 20;
       }
 
-      // Redirect Chain
-      artY = section('REDIRECT CHAIN', Math.max(artY, 340));
-      const chain = analysis.redirect_chain || [caseData.url];
+      // Redirect chain
+      if (y > 680) { doc.addPage(); drawPageHeader('FORENSIC ARTIFACT ANALYSIS (CONT.)'); y = 45; }
+      y = sectionLabel('REDIRECT CHAIN TRACE', y);
+      const chain = analysis.redirect_chain || [caseData.url || caseData.target_ip || 'N/A'];
       chain.forEach((url, i) => {
-        doc.font('Helvetica').fontSize(9)
-           .fillColor(i === chain.length - 1 ? colors.success : colors.accent)
-           .text(`${i + 1}. ${url}`, 55, artY, { width: 480 });
-        artY += 16;
+        const isFinal = i === chain.length - 1;
+        const prefix = isFinal ? '[FINAL]' : `[HOP ${i + 1}]`;
+        doc.font('Courier-Bold').fontSize(7.5).fillColor(isFinal ? c.danger : c.accent)
+           .text(prefix, MARGIN, y);
+        doc.font('Courier').fontSize(7.5).fillColor(c.textDark)
+           .text(String(url), MARGIN + 55, y, { width: CONTENT_W - 55 });
+        y += 14;
       });
-      artY += 20;
+      y += 10;
 
       // Screenshot
-      artY = section('EVIDENCE SCREENSHOT', artY);
       const screenshot = analysis.page_screenshot;
       if (screenshot && screenshot.startsWith('data:image/png;base64,')) {
+        if (y > 600) { doc.addPage(); drawPageHeader('EVIDENCE SCREENSHOT'); y = 45; }
+        y = sectionLabel('EVIDENCE SCREENSHOT (BROWSER SANDBOX CAPTURE)', y);
         try {
           const base64Data = screenshot.replace(/^data:image\/\w+;base64,/, '');
-          const buffer = Buffer.from(base64Data, 'base64');
-          // Guard against negative height when artY has grown large
-          const availableHeight = Math.max(50, Math.min(350, 800 - artY - 50));
-          if (artY + availableHeight > 800) {
-            // Not enough space — add a new page for the screenshot
-            doc.addPage();
-            artY = 50;
+          const imgBuf = Buffer.from(base64Data, 'base64');
+          const maxH = Math.min(300, 780 - y - 20);
+          if (maxH > 40) {
+            doc.image(imgBuf, MARGIN, y, { fit: [CONTENT_W, maxH], align: 'center', valign: 'center' });
+            y += maxH + 15;
           }
-          doc.image(buffer, 50, artY, {
-            fit: [495, availableHeight],
-            align: 'center',
-            valign: 'center',
-          });
-        } catch (imgErr) {
-          doc.font('Helvetica-Oblique').fontSize(9).fillColor(colors.subtext)
-             .text('Screenshot could not be rendered in PDF.', 50, artY);
+        } catch (_) {
+          doc.font('Helvetica-Oblique').fontSize(9).fillColor(c.muted)
+             .text('Screenshot could not be rendered.', MARGIN, y);
+          y += 15;
         }
       } else {
-        doc.font('Helvetica-Oblique').fontSize(9).fillColor(colors.subtext)
-           .text('No screenshot was captured during analysis.', 50, artY);
+        if (y > 700) { doc.addPage(); drawPageHeader('FORENSIC ARTIFACT ANALYSIS (CONT.)'); y = 45; }
+        doc.font('Helvetica-Oblique').fontSize(9).fillColor(c.muted)
+           .text('No screenshot was captured during sandbox analysis.', MARGIN, y);
+        y += 15;
       }
 
-      // ── PAGE 4: CHAIN OF CUSTODY & LEGAL ──
+      // ══════════════════════════════════════════════════════════
+      // PAGE 4: CHAIN OF CUSTODY & LEGAL
+      // ══════════════════════════════════════════════════════════
       doc.addPage();
-      doc.rect(0, 0, 595.28, 20).fill(colors.dark);
+      drawPageHeader('CHAIN OF CUSTODY & LEGAL CERTIFICATION');
+      y = 45;
 
-      doc.fillColor(colors.dark)
-         .font('Helvetica-Bold')
-         .fontSize(16)
-         .text('CHAIN OF CUSTODY', 50, 35);
-
-      let custodyY = 60;
+      y = sectionLabel('FORENSIC CHAIN OF CUSTODY', y);
 
       const custodyChain = data.custodyChain || [];
       if (custodyChain.length > 0) {
-        // Table header
-        doc.font('Helvetica-Bold').fontSize(8).fillColor(colors.subtext);
-        doc.text('Timestamp', 50, custodyY);
-        doc.text('Action', 180, custodyY);
-        doc.text('Analyst', 310, custodyY);
-        doc.text('Hash (SHA-256)', 400, custodyY);
-        doc.moveTo(50, custodyY + 12).lineTo(545, custodyY + 12).stroke(colors.border).lineWidth(0.5);
-        custodyY += 16;
-
+        const ccols = [105, 130, 100, 170];
+        y = drawTableHeader(['Timestamp', 'Action', 'Analyst', 'SHA-256 Hash (After)'], ccols, MARGIN, y);
         custodyChain.forEach((entry, i) => {
-          if (i > 0) {
-            doc.moveTo(50, custodyY - 2).lineTo(545, custodyY - 2).stroke(colors.border).lineWidth(0.3).opacity(0.3);
-            doc.opacity(1);
-          }
-          const ts = new Date(entry.timestamp).toLocaleString('en-US', { month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit' });
-          const hashShort = (entry.hash_after || 'N/A').substring(0, 12) + '...';
-          const analystName = entry.user?.name || entry.userId || 'System';
-
-          doc.font('Helvetica').fontSize(7)
-             .fillColor(colors.muted).text(ts, 50, custodyY, { width: 120 })
-             .fillColor(colors.text).text(entry.action, 180, custodyY, { width: 120 })
-             .fillColor(colors.subtext).text(analystName, 310, custodyY, { width: 80 })
-             .font('Courier').fontSize(6).fillColor(colors.accent)
-             .text(hashShort, 400, custodyY, { width: 140 });
-
-          custodyY += 16;
+          const ts = new Date(entry.timestamp).toLocaleString('en-US', {
+            month: 'short', day: '2-digit', year: 'numeric',
+            hour: '2-digit', minute: '2-digit'
+          });
+          const hashShort = entry.hash_after
+            ? entry.hash_after.substring(0, 20) + '...'
+            : 'N/A';
+          const analystName = entry.user?.name || 'System';
+          y = drawTableRow(
+            [ts, entry.action, analystName, hashShort],
+            ccols, MARGIN, y, i,
+            [c.subtle, c.textDark, c.textDark, c.accent]
+          );
         });
-        custodyY += 10;
+        y += 12;
+        doc.font('Helvetica').fontSize(8).fillColor(c.subtle)
+           .text('Cryptographic SHA-256 hashes above establish tamper-evidence for each recorded event.', MARGIN, y, { width: CONTENT_W });
+        y += 20;
       } else {
-        doc.font('Helvetica-Oblique').fontSize(9).fillColor(colors.subtext)
-           .text('No chain of custody records have been created yet. Records are generated when reports are compiled and cases are analyzed.', 50, custodyY, { width: 495, lineGap: 2 });
-        custodyY += 40;
+        doc.rect(MARGIN, y, CONTENT_W, 40).fill(c.lightBg);
+        doc.font('Helvetica-Oblique').fontSize(9).fillColor(c.subtle)
+           .text('No chain of custody records exist yet. Records are created when reports are compiled and analyses are performed.', MARGIN + 12, y + 12, { width: CONTENT_W - 24 });
+        y += 50;
       }
 
-      doc.font('Helvetica').fontSize(8).fillColor(colors.subtext)
-         .text('The above cryptographic hashes establish the forensic integrity of this report. Each entry represents a verifiable event in the case lifecycle.', 50, custodyY, { width: 495 });
-      custodyY += 20;
+      // Digital signature block
+      y = sectionLabel('DIGITAL FORENSIC SIGNATURE (HMAC-SHA256)', y);
+      doc.rect(MARGIN, y, CONTENT_W, 36).fill(c.dark);
+      doc.font('Courier-Bold').fontSize(7).fillColor(c.accent)
+         .text(data.digitalSignature || 'SIGNATURE UNAVAILABLE', MARGIN + 10, y + 8, { width: CONTENT_W - 20, wordBreak: true, ellipsis: true });
+      doc.font('Helvetica').fontSize(7).fillColor(c.muted)
+         .text(`Version: ${data.version || 1}  |  ${new Date(data.generated_at).toUTCString()}`, MARGIN + 10, y + 24);
+      y += 46;
 
-      // Footer on every page
+      // Legal disclaimer
+      y = sectionLabel('LEGAL NOTICE & CERTIFICATION', y);
+      const legalText = `This document is a confidential forensic report generated by PhishTrack, an automated cyber intelligence platform. The digital signature embedded above (HMAC-SHA256) cryptographically binds the case metadata, threat assessment, and forensic evidence to this specific report version. Any modification to the content of this document will invalidate the cryptographic signature and will be detectable via the VERIFY function.
+
+This report may be used as a legally admissible forensic artifact in cybersecurity investigations, law enforcement proceedings, and incident response documentation. The chain of custody records above provide a verifiable audit trail for all case lifecycle events.
+
+Classification: CONFIDENTIAL — FOR AUTHORIZED PERSONNEL ONLY.
+Analyst: ${analyst.name || 'System'}  |  Organization: ${analyst.organization || caseData.organization || 'PhishTrack SOC'}`;
+
+      doc.rect(MARGIN, y, CONTENT_W, 110).fill(c.lightBg);
+      doc.rect(MARGIN, y, CONTENT_W, 110).stroke(c.border).lineWidth(0.5);
+      doc.font('Helvetica').fontSize(8.5).fillColor(c.textDark)
+         .text(legalText, MARGIN + 12, y + 10, { width: CONTENT_W - 24, align: 'justify', lineGap: 2 });
+      y += 120;
+
+      // ── Footer on every page ──────────────────────────────────
       const range = doc.bufferedPageRange();
       for (let i = 0; i < range.count; i++) {
         doc.switchToPage(i);
-        doc.fillColor(colors.muted)
-           .font('Helvetica')
-           .fontSize(7)
+        // Bottom separator
+        doc.rect(0, 822, W, 20).fill(c.dark);
+        doc.fillColor(c.muted).font('Helvetica').fontSize(6.5)
            .text(
-             `PhishTrack Forensic Report | Generated: ${new Date(data.generated_at).toUTCString()} | Page ${i + 1}/${range.count}`,
-             50, 810, { width: 495, align: 'center' }
+             `PhishTrack Forensic Report  |  Case: ${caseData.case_number || 'N/A'}  |  Generated: ${new Date(data.generated_at).toUTCString()}  |  Page ${i + 1} of ${range.count}`,
+             MARGIN, 828, { width: W - MARGIN * 2, align: 'center' }
            );
       }
 
-      // Final page: digital signature + legal notice
-      doc.switchToPage(range.count - 1);
-      const footerY = 700;
-
-      doc.moveTo(50, footerY).lineTo(545, footerY).stroke(colors.border).lineWidth(1);
-
-      doc.fillColor(colors.subtext)
-         .font('Helvetica-Bold')
-         .fontSize(8)
-         .text('DIGITAL FORENSIC SIGNATURE (HMAC-SHA256)', 50, footerY + 15);
-
-      doc.font('Courier')
-         .fontSize(7)
-         .fillColor(colors.text)
-         .text(data.digitalSignature || 'N/A', 50, footerY + 27, { width: 495, wordBreak: true });
-
-      doc.font('Helvetica')
-         .fontSize(8)
-         .fillColor(colors.subtext)
-         .text(`Report Version: ${data.version || 1}  |  Analyst: ${analyst.name || 'System'}  |  ${new Date(data.generated_at).toUTCString()}`, 50, footerY + 50);
-
-      doc.text(
-        'This report was automatically generated by PhishTrack Forensics. The digital signature above cryptographically binds the case metadata, threat assessment, and forensic analysis data. Any alteration to this report will invalidate the HMAC-SHA256 signature. This document serves as a legally admissible forensic artifact in cybersecurity investigations.',
-        50, footerY + 70, { width: 495, align: 'justify', lineGap: 2 }
-      );
-
       doc.end();
-
     } catch (err) {
       reject(err);
     }
