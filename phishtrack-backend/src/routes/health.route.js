@@ -20,4 +20,15 @@ router.get('/health', async (req, res) => {
   });
 });
 
+router.get('/logs', (req, res) => {
+  const fs = require('fs');
+  try {
+    const logs = fs.readFileSync('logs/error.log', 'utf8');
+    const lines = logs.split('\n').filter(Boolean);
+    res.json({ logs: lines.slice(-20) }); // last 20 errors
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;
