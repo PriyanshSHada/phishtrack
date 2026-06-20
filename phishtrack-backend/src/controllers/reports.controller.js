@@ -124,7 +124,8 @@ exports.generateReport = async (req, res, next) => {
       }
     });
 
-    res.status(201).json(report);
+    const { pdf_buffer, ...reportData } = report;
+    res.status(201).json(reportData);
   } catch (err) {
     logger.error('Error generating report', { error: err.message, stack: err.stack, caseId: req.params.caseId });
     next(err);
@@ -149,7 +150,8 @@ exports.getReport = async (req, res, next) => {
     });
     if (!report) return res.status(404).json({ error: 'Report not found' });
     if (report.case.userId !== req.user.userId) return res.status(403).json({ error: 'Access denied' });
-    res.json(report);
+    const { pdf_buffer, ...reportData } = report;
+    res.json(reportData);
   } catch (err) {
     next(err);
   }
@@ -168,7 +170,11 @@ exports.getReportByCase = async (req, res, next) => {
       where: { caseId },
       orderBy: { version: 'desc' }
     });
-    res.json(reports);
+    const safeReports = reports.map(r => {
+      const { pdf_buffer, ...rest } = r;
+      return rest;
+    });
+    res.json(safeReports);
   } catch (err) {
     next(err);
   }
