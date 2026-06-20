@@ -13,6 +13,16 @@ if (missing.length) {
 }
 
 const PORT = process.env.PORT || 3000;
+
+try {
+  const { execSync } = require('child_process');
+  logger.info('Running Prisma Migrations before startup...');
+  execSync('npx prisma migrate deploy', { stdio: 'inherit' });
+  logger.info('Prisma Migrations completed successfully.');
+} catch (err) {
+  logger.error('Failed to run Prisma Migrations:', err);
+}
+
 app.listen(PORT, async () => {
   logger.info(`PhishTrack backend listening on port ${PORT}`);
 
