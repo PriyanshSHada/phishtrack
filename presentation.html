@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>PhishTrack - Presentation</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+  <!-- Reveal.js CSS -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.3.1/reset.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.3.1/reveal.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.3.1/theme/black.min.css">
+  
+  <style>
+    .reveal h1, .reveal h2, .reveal h3 { color: #4ade80; text-transform: none; }
+    .reveal h4 { color: #facc15; }
+    .highlight { color: #60a5fa; font-weight: bold; }
+    ul { list-style-type: square; }
+    li { margin-bottom: 15px; font-size: 0.9em; }
+    .badge { background: #333; padding: 5px 15px; border-radius: 20px; font-size: 0.6em; display: inline-block; margin: 5px; border: 1px solid #555; }
+    .slide-content { text-align: left; background: rgba(255,255,255,0.05); padding: 30px; border-radius: 10px; margin-top: 20px; }
+  </style>
+</head>
+<body>
+  <div class="reveal">
+    <div class="slides">
+
+      <!-- Slide 1: Title Page -->
+      <section>
+        <img src="https://cdn-icons-png.flaticon.com/512/3063/3063822.png" alt="Phishing Icon" style="width:150px; background:white; border-radius:20px; padding:10px; margin-bottom:20px;">
+        <h1>PhishTrack</h1>
+        <h3>Mobile Threat Intelligence Platform</h3>
+        <p><small>Empowering SOC Analysts on the go</small></p>
+      </section>
+
+      <!-- Slide 2: The Problem -->
+      <section>
+        <h2>The Problem</h2>
+        <div class="slide-content">
+          <h4 style="color: #ef4444;">Why we need a better tool</h4>
+          <ul>
+            <li>Phishing attacks are rising rapidly, targeting employees everywhere.</li>
+            <li>Incident Response teams are tied to their desktop environments.</li>
+            <li>Manual evidence gathering across OSINT tools is incredibly slow.</li>
+            <li>Lack of proper chain of custody tracking for digital evidence.</li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- Slide 3: The Solution -->
+      <section>
+        <h2>The Solution</h2>
+        <div class="slide-content">
+          <h4 style="color: #4ade80;">PhishTrack</h4>
+          <ul>
+            <li><span class="highlight">A Full-Stack Mobile Platform:</span> Brings power to the palm of your hand.</li>
+            <li>One-tap automated analysis executing 5+ threat checks instantly.</li>
+            <li>Cryptographically secure Chain of Custody for evidence preservation.</li>
+            <li>Seamless SOC-on-the-go experience for rapid triage.</li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- Slide 4: System Architecture -->
+      <section>
+        <h2>System Architecture</h2>
+        <div class="slide-content" style="text-align: center;">
+          <h4 style="color: #60a5fa;">End-to-End Flow</h4>
+          <p><strong>Frontend:</strong> Android App (Kotlin / Jetpack Compose)</p>
+          <p>⬇️ <em>REST API via Retrofit</em> ⬇️</p>
+          <p><strong>Backend:</strong> Node.js & Express API Server</p>
+          <p>⬇️ <em>Prisma ORM</em> ⬇️</p>
+          <p><strong>Database:</strong> PostgreSQL hosted on Supabase</p>
+          <p><strong>Cloud Infra:</strong> Deployed seamlessly via Render</p>
+        </div>
+      </section>
+
+      <!-- Slide 5: Threat Mapping -->
+      <section>
+        <h2>Core Feature: Threat Map</h2>
+        <div class="slide-content">
+          <ul>
+            <li>Interactive map visualizing the geographic origin of phishing attacks.</li>
+            <li>Live statistics on emerging campaigns (e.g., WhatsApp vs Email).</li>
+            <li>Real-time dashboard summarizing the team's ongoing case load.</li>
+            <li>Trend graphs identifying spikes in phishing activities.</li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- Slide 6: Automated Analysis -->
+      <section>
+        <h2>Automated Analysis Engine</h2>
+        <div class="slide-content">
+          <p>PhishTrack aggregates intelligence from multiple sources instantly:</p>
+          <ul>
+            <li><strong>VirusTotal:</strong> Sandboxed URL and IP scanning.</li>
+            <li><strong>WHOIS:</strong> Domain registration age and registrar details.</li>
+            <li><strong>SSL Validation:</strong> Certificate verification and trust chaining.</li>
+            <li><strong>Homograph Checks:</strong> Detecting lookalike "typosquatted" domains.</li>
+            <li><strong>MITRE ATT&CK:</strong> Mapping observed behaviors to known techniques.</li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- Slide 7: Forensic Reports -->
+      <section>
+        <h2>Forensic Reporting</h2>
+        <div class="slide-content">
+          <ul>
+            <li>Automatically compile comprehensive PDF reports.</li>
+            <li>Includes network indicators, analysis verdicts, and AI summaries.</li>
+            <li><strong>Tamper-Proof:</strong> Files are stored in Supabase with database-level buffer backups.</li>
+            <li><strong>Integrity:</strong> Every report is tied to a cryptographic signature.</li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- Slide 8: Frontend Deep Dive -->
+      <section>
+        <h2>Frontend: Android Native</h2>
+        <div style="margin-top:20px;">
+          <div>
+            <span class="badge">Kotlin</span>
+            <span class="badge">Jetpack Compose</span>
+            <span class="badge">Retrofit</span>
+            <span class="badge">Coroutines</span>
+          </div>
+          <div class="slide-content" style="margin-top: 10px;">
+            <ul>
+              <li><strong>MVVM Architecture:</strong> Clean separation of UI and logic.</li>
+              <li><strong>Offline Caching:</strong> Room database integration ensures fast loading.</li>
+              <li><strong>Material Design 3:</strong> Dark-mode native interface with micro-animations.</li>
+              <li><strong>OTP Authentication:</strong> Secure email-based login flows.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 9: Backend Deep Dive -->
+      <section>
+        <h2>Backend: Node.js Power</h2>
+        <div style="margin-top:20px;">
+          <div>
+            <span class="badge">Node.js</span>
+            <span class="badge">Express</span>
+            <span class="badge">Prisma ORM</span>
+            <span class="badge">PDFKit</span>
+          </div>
+          <div class="slide-content" style="margin-top: 10px;">
+            <ul>
+              <li>Secure JWT authentication with express-rate-limit.</li>
+              <li>Asynchronous threat intelligence orchestration.</li>
+              <li>Robust error handling with Winston logging.</li>
+              <li>Dynamic PDF generation using PDFKit streams.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 10: Conclusion -->
+      <section>
+        <h2>Conclusion & Future Scope</h2>
+        <div class="slide-content">
+          <ul>
+            <li>PhishTrack bridges the gap between complex OSINT and mobile convenience.</li>
+            <li>It enables SOC analysts to triage critical incidents from anywhere.</li>
+            <li><strong>Future Scope:</strong>
+              <ul>
+                <li>Integrate with internal ticketing systems (Jira/ServiceNow).</li>
+                <li>Add LLM-powered conversational analysis.</li>
+                <li>Push notifications for critical new incidents.</li>
+              </ul>
+            </li>
+          </ul>
+          <h4 style="color: #60a5fa; text-align: center; margin-top: 30px;">Ready for Deployment.</h4>
+        </div>
+      </section>
+
+    </div>
+  </div>
+
+  <!-- Reveal.js Scripts -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.3.1/reveal.min.js"></script>
+  <script>
+    Reveal.initialize({
+      hash: true,
+      transition: 'slide',
+      backgroundTransition: 'fade'
+    });
+  </script>
+</body>
+</html>

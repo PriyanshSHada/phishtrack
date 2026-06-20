@@ -40,6 +40,19 @@ exports.runAnalysis = async (req, res, next) => {
       ipGeo = ipgeoResult.status === 'fulfilled' && ipgeoResult.value !== null ? ipgeoResult.value : null;
       virustotal = virustotalResult.status === 'fulfilled' ? virustotalResult.value : null;
       sandbox = sandboxResult.status === 'fulfilled' ? sandboxResult.value : {};
+
+      if (ipGeo) {
+        whois = {
+          raw: "IP WHOIS data extracted from Regional Internet Registry (RIR) / GeoIP.",
+          domain: targetIp,
+          registrar: ipGeo.org || ipGeo.isp || ipGeo.as || 'Unknown',
+          country: ipGeo.country || ipGeo.countryCode || 'Unknown',
+          creationDate: null,
+          expiryDate: null,
+          ageDays: null,
+          isSuspiciousAge: false
+        };
+      }
     } else {
       const [
         whoisResult,

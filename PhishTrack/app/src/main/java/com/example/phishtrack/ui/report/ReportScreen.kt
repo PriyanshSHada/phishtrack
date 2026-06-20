@@ -104,21 +104,19 @@ fun ReportScreen(
             val bytes = (downloadState as UiState.Success<ByteArray>).data
             try {
                 val detail = (caseDetailState as? UiState.Success)?.data
-                val latestReport = detail?.reports?.firstOrNull()
-                if (latestReport != null) {
-                    val outputFile = File(context.cacheDir, "report_${latestReport.id}.pdf")
-                    withContext(Dispatchers.IO) {
-                        outputFile.writeBytes(bytes)
-                    }
-                    val uri = FileProvider.getUriForFile(
-                        context, "${context.packageName}.fileprovider", outputFile
-                    )
-                    val intent = Intent(Intent.ACTION_VIEW).apply {
-                        setDataAndType(uri, "application/pdf")
-                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                    }
-                    context.startActivity(intent)
+                // Use a random UUID for the temp file since we just need to display the downloaded bytes
+                val outputFile = File(context.cacheDir, "report_${java.util.UUID.randomUUID()}.pdf")
+                withContext(Dispatchers.IO) {
+                    outputFile.writeBytes(bytes)
                 }
+                val uri = FileProvider.getUriForFile(
+                    context, "${context.packageName}.fileprovider", outputFile
+                )
+                val intent = Intent(Intent.ACTION_VIEW).apply {
+                    setDataAndType(uri, "application/pdf")
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                context.startActivity(intent)
             } catch (e: android.content.ActivityNotFoundException) {
                 snackbarHostState.showSnackbar("No PDF viewer found. Opening Play Store...")
                 try {
@@ -758,10 +756,12 @@ fun ReportScreen(
                     )
                     Spacer(modifier = Modifier.height(10.dp))
 
-                    CollapsibleSection(title = "🌐  WHOIS Domain Lookup") {
+                    val whoisTitle = if (detail.targetType == "IP") "🌐  IP Registry Information" else "🌐  WHOIS Domain Lookup"
+                    CollapsibleSection(title = whoisTitle) {
                         val whois = analysis?.whoisData
                         if (whois != null) {
-                            InfoRow("Registrar", whois.safeString("registrar") ?: "Unavailable")
+                            val ownerLabel = if (detail.targetType == "IP") "Owner / ISP" else "Registrar"
+                            InfoRow(ownerLabel, whois.safeString("registrar") ?: "Unavailable")
                             InfoRow("Country", whois.safeString("country") ?: "Unavailable")
                             InfoRow("Domain Age", whois.safeInt("ageDays")?.let { "$it days" } ?: "Unavailable")
                             InfoRow("Created", whois.safeString("creationDate")?.take(10) ?: "Unavailable")

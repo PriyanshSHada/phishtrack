@@ -292,31 +292,26 @@ exports.generatePdfReport = (data) => {
       drawPageHeader('FORENSIC ARTIFACT ANALYSIS');
       y = 45;
 
-      // WHOIS
-      y = sectionLabel('WHOIS DOMAIN REGISTRY', y);
+      // WHOIS / IP Registry
+      y = sectionLabel(caseData.target_type === 'IP' ? 'IP REGISTRY INFORMATION' : 'WHOIS DOMAIN REGISTRY', y);
       const whois = analysis.whois_data || {};
       const whoisRows = [
-        ['Registrar', whois.registrar],
+        [caseData.target_type === 'IP' ? 'Owner / ISP' : 'Registrar', whois.registrar],
         ['Country', whois.country],
         ['Domain Age', whois.ageDays != null ? `${whois.ageDays} days` : null],
         ['Created', whois.creationDate ? new Date(whois.creationDate).toLocaleDateString() : null],
         ['Expires', whois.expiryDate ? new Date(whois.expiryDate).toLocaleDateString() : null],
         ['Suspicious Age', whois.isSuspiciousAge ? 'YES — HIGH RISK' : 'No'],
       ];
-      if (caseData.target_type === 'IP') {
-        doc.font('Helvetica-Oblique').fontSize(9).fillColor(c.muted).text('WHOIS Domain Registry data is not applicable for IP addresses.', MARGIN, y);
-        y += 20;
-      } else {
-        whoisRows.forEach(([label, value], i) => {
-          const wx = MARGIN + (i % 2) * (CONTENT_W / 2 + 5);
-          const wy = y + Math.floor(i / 2) * 30;
-          doc.font('Helvetica-Bold').fontSize(8).fillColor(c.subtle).text(label + ':', wx, wy);
-          const isRisk = label === 'Suspicious Age' && whois.isSuspiciousAge;
-          doc.font('Helvetica').fontSize(9).fillColor(isRisk ? c.danger : c.textDark)
-             .text(String(value || 'Unknown'), wx, wy + 11, { width: CONTENT_W / 2 - 10 });
-        });
-        y += Math.ceil(whoisRows.length / 2) * 30 + 15;
-      }
+      whoisRows.forEach(([label, value], i) => {
+        const wx = MARGIN + (i % 2) * (CONTENT_W / 2 + 5);
+        const wy = y + Math.floor(i / 2) * 30;
+        doc.font('Helvetica-Bold').fontSize(8).fillColor(c.subtle).text(label + ':', wx, wy);
+        const isRisk = label === 'Suspicious Age' && whois.isSuspiciousAge;
+        doc.font('Helvetica').fontSize(9).fillColor(isRisk ? c.danger : c.textDark)
+           .text(String(value || 'Unknown'), wx, wy + 11, { width: CONTENT_W / 2 - 10 });
+      });
+      y += Math.ceil(whoisRows.length / 2) * 30 + 15;
 
       // Network & SSL
       y = sectionLabel('NETWORK & SSL DETAILS', y);

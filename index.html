@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PhishTrack - Mobile Threat Intelligence</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+  <style>
+    body {
+      background-color: #0f172a; /* slate-900 */
+      color: #f8fafc; /* slate-50 */
+      font-family: 'Inter', sans-serif;
+    }
+    .glass-card {
+      background: rgba(30, 41, 59, 0.7); /* slate-800 with opacity */
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    .gradient-text {
+      background: linear-gradient(to right, #4ade80, #3b82f6);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+  <!-- Navbar -->
+  <nav class="p-6 flex justify-between items-center border-b border-slate-800">
+    <div class="flex items-center space-x-3">
+      <div class="bg-green-400 text-slate-900 p-2 rounded-lg">
+        <i class="fa-solid fa-shield-halved text-xl"></i>
+      </div>
+      <span class="text-2xl font-bold tracking-wider">PhishTrack</span>
+    </div>
+    <div class="hidden md:flex space-x-6">
+      <a href="#features" class="hover:text-green-400 transition">Features</a>
+      <a href="#stack" class="hover:text-green-400 transition">Tech Stack</a>
+      <a href="presentation.html" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-md font-semibold transition shadow-lg shadow-blue-500/30">View Presentation</a>
+    </div>
+  </nav>
+
+  <!-- Hero Section -->
+  <header class="flex-grow flex flex-col justify-center items-center text-center px-4 py-20">
+    <h1 class="text-5xl md:text-7xl font-extrabold mb-6 tracking-tight">
+      Mobile <span class="gradient-text">Threat Intelligence</span>
+    </h1>
+    <p class="text-xl md:text-2xl text-slate-400 max-w-3xl mb-10 leading-relaxed">
+      An end-to-end incident response platform designed for SOC Analysts on the go. Automate phishing analysis, generate forensic reports, and track threats in real-time.
+    </p>
+    <div class="flex space-x-4">
+      <a href="presentation.html" class="px-8 py-4 bg-green-500 hover:bg-green-600 text-slate-900 rounded-lg font-bold text-lg transition shadow-xl shadow-green-500/20 flex items-center space-x-2">
+        <i class="fa-solid fa-desktop"></i>
+        <span>Project Slides</span>
+      </a>
+      <a href="https://github.com/PriyanshSHada/phishtrack" target="_blank" class="px-8 py-4 glass-card hover:bg-slate-700 rounded-lg font-bold text-lg transition flex items-center space-x-2">
+        <i class="fa-brands fa-github"></i>
+        <span>View Source</span>
+      </a>
+    </div>
+  </header>
+
+  <!-- Features Section -->
+  <section id="features" class="py-20 bg-slate-900 border-t border-slate-800 px-6">
+    <div class="max-w-7xl mx-auto">
+      <h2 class="text-3xl font-bold mb-12 text-center">Core Capabilities</h2>
+      
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <!-- Feature 1 -->
+        <div class="glass-card p-8 rounded-2xl hover:-translate-y-2 transition duration-300">
+          <i class="fa-solid fa-microscope text-4xl text-blue-400 mb-6"></i>
+          <h3 class="text-xl font-bold mb-3">Automated OSINT</h3>
+          <p class="text-slate-400 text-sm leading-relaxed">
+            Instant sandbox execution via VirusTotal, combined with WHOIS, SSL validation, IP geolocation, and homograph detection.
+          </p>
+        </div>
+        
+        <!-- Feature 2 -->
+        <div class="glass-card p-8 rounded-2xl hover:-translate-y-2 transition duration-300">
+          <i class="fa-solid fa-file-pdf text-4xl text-red-400 mb-6"></i>
+          <h3 class="text-xl font-bold mb-3">Forensic Reports</h3>
+          <p class="text-slate-400 text-sm leading-relaxed">
+            Generate tamper-proof, cryptographically signed PDF reports directly from the mobile app, securely stored in the cloud.
+          </p>
+        </div>
+
+        <!-- Feature 3 -->
+        <div class="glass-card p-8 rounded-2xl hover:-translate-y-2 transition duration-300">
+          <i class="fa-solid fa-earth-americas text-4xl text-green-400 mb-6"></i>
+          <h3 class="text-xl font-bold mb-3">Live Threat Map</h3>
+          <p class="text-slate-400 text-sm leading-relaxed">
+            Visualize global phishing campaigns, track incident trends, and monitor your SOC dashboard in real-time.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Tech Stack Section -->
+  <section id="stack" class="py-20 px-6">
+    <div class="max-w-4xl mx-auto text-center">
+      <h2 class="text-3xl font-bold mb-10">Built with Modern Tech</h2>
+      <div class="flex flex-wrap justify-center gap-4">
+        <span class="px-6 py-3 glass-card rounded-full font-semibold flex items-center space-x-2"><i class="fa-brands fa-android text-green-500"></i><span>Kotlin / Jetpack Compose</span></span>
+        <span class="px-6 py-3 glass-card rounded-full font-semibold flex items-center space-x-2"><i class="fa-brands fa-node-js text-green-400"></i><span>Node.js / Express</span></span>
+        <span class="px-6 py-3 glass-card rounded-full font-semibold flex items-center space-x-2"><i class="fa-solid fa-database text-blue-400"></i><span>PostgreSQL / Prisma</span></span>
+        <span class="px-6 py-3 glass-card rounded-full font-semibold flex items-center space-x-2"><i class="fa-solid fa-cloud text-emerald-400"></i><span>Supabase</span></span>
+        <span class="px-6 py-3 glass-card rounded-full font-semibold flex items-center space-x-2"><i class="fa-solid fa-server text-indigo-400"></i><span>Render Cloud</span></span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="p-8 text-center text-slate-500 border-t border-slate-800 text-sm">
+    <p>&copy; 2026 PhishTrack Project. Built for advanced threat analysis.</p>
+  </footer>
+
+</body>
+</html>
