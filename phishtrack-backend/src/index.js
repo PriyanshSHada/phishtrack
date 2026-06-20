@@ -16,9 +16,13 @@ const PORT = process.env.PORT || 3000;
 
 try {
   const { execSync } = require('child_process');
-  logger.info('Running Prisma Migrations before startup...');
-  execSync('npx prisma migrate deploy', { stdio: 'inherit' });
-  logger.info('Prisma Migrations completed successfully.');
+  logger.info('Running Prisma DB Push before startup to force schema sync...');
+  const directUrl = process.env.DATABASE_URL.replace('6543', '5432').replace('pgbouncer=true', 'pgbouncer=false');
+  execSync('npx prisma db push --accept-data-loss', { 
+    stdio: 'inherit',
+    env: { ...process.env, DATABASE_URL: directUrl }
+  });
+  logger.info('Prisma DB Push completed successfully.');
 } catch (err) {
   logger.error('Failed to run Prisma Migrations:', err);
 }
