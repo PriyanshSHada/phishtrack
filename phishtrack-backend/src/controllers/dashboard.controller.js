@@ -3,11 +3,16 @@ const prisma = require('../prismaClient');
 exports.getStats = async (req, res, next) => {
   try {
     const userId = req.user.userId;
-    const users = 1; // Logged-in user represents 1 user
     const cases = await prisma.case.count({ where: { userId } });
     const analyses = await prisma.analysis.count({ where: { case: { userId } } });
     const reports = await prisma.report.count({ where: { case: { userId } } });
-    res.json({ users, cases, analyses, reports });
+    const highRisk = await prisma.analysis.count({
+      where: {
+        case: { userId },
+        threat_score: { gte: 70 }
+      }
+    });
+    res.json({ highRisk, cases, analyses, reports });
   } catch (err) {
     next(err);
   }

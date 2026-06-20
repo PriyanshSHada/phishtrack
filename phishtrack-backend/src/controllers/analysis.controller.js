@@ -95,7 +95,10 @@ exports.runAnalysis = async (req, res, next) => {
       data: {
         caseId: c.id,
         threat_score: aiResult.threat_score,
+        confidence: aiResult.confidence || 50,
         severity: severity,
+        verdict: aiResult.verdict || 'Suspicious',
+        brand_impersonated: aiResult.brand_impersonated || null,
         whois_data: whois,
         ip_geolocation: ipGeo,
         ssl_info: ssl,
@@ -106,13 +109,26 @@ exports.runAnalysis = async (req, res, next) => {
         ai_summary: aiResult.ai_summary,
         ai_indicators: aiResult.indicators,
         ai_techniques: aiResult.techniques,
+        mitre_techniques: aiResult.mitre_techniques || [],
         sandbox_version: 'Puppeteer Headless 1.0'
       }
     });
 
+    // Smart status update based on threat score
+    let autoStatus = 'Investigating';
+    let autoPriority = undefined;
+    if (aiResult.threat_score >= 90) {
+      autoPriority = 'Critical';
+    } else if (aiResult.threat_score <= 10 && aiResult.verdict === 'Benign') {
+      autoStatus = 'Closed'; // Auto-close obvious benign cases
+    }
+
     await prisma.case.update({
       where: { id: c.id },
-      data: { status: 'Investigating' }
+      data: {
+        status: autoStatus,
+        ...(autoPriority ? { priority: autoPriority } : {})
+      }
     });
 
     await prisma.auditLog.create({

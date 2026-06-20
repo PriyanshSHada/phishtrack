@@ -18,7 +18,7 @@ exports.runSandbox = async (url) => {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36',
           'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8'
         },
-        timeout: 15000
+        timeout: 30000
       });
 
       if (response.status >= 300 && response.status < 400 && response.headers.location) {
@@ -44,7 +44,7 @@ exports.runSandbox = async (url) => {
         const screenshotApiUrl = `https://api.screenshotone.com/take?access_key=${apiKey}&url=${encodeURIComponent(currentUrl)}&full_page=true&viewport_width=1280&viewport_height=720&format=png`;
         const screenshotRes = await axios.get(screenshotApiUrl, {
           responseType: 'arraybuffer',
-          timeout: 20000
+          timeout: 35000
         });
         screenshotBase64 = Buffer.from(screenshotRes.data, 'binary').toString('base64');
       } else {
@@ -56,7 +56,7 @@ exports.runSandbox = async (url) => {
         const fallbackUrl = `https://image.thum.io/get/width/1280/crop/720/${currentUrl}`;
         const fallbackRes = await axios.get(fallbackUrl, {
           responseType: 'arraybuffer',
-          timeout: 20000
+          timeout: 35000
         });
         screenshotBase64 = Buffer.from(fallbackRes.data, 'binary').toString('base64');
       } catch (fallbackErr) {

@@ -50,7 +50,10 @@ model Analysis {
   id                String    @id @default(uuid())
   caseId            String
   threat_score      Int?
+  confidence        Int?      @default(50)
   severity          Severity?
+  verdict           String?   @default("Suspicious")
+  brand_impersonated String?
   whois_data        Json?
   ip_geolocation    Json?
   ssl_info          Json?
@@ -61,6 +64,7 @@ model Analysis {
   ai_summary        String?
   ai_indicators     String[]
   ai_techniques     String[]
+  mitre_techniques  Json?
   analyzed_at       DateTime? @default(now())
   sandbox_version   String?
   case              Case      @relation(fields: [caseId], references: [id])
@@ -72,6 +76,7 @@ model Report {
   version           Int      @default(1)
   pdf_url           String?
   supabase_path     String?
+  pdf_buffer        Bytes?
   digital_signature String?
   generatedById     String
   generated_at      DateTime @default(now())
@@ -119,6 +124,7 @@ enum Source {
   WhatsApp
   Email
   SMS
+  Social_Media
   Other
 }
 

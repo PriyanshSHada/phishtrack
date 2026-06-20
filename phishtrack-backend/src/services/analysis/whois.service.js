@@ -24,7 +24,7 @@ exports.getWhoisData = async (urlStr) => {
 
     try {
       // 1. Try free REST API (bypasses Render Port 43 block)
-      const res = await axios.get(`https://networkcalc.com/api/dns/whois/${domain}`, { timeout: 15000 });
+      const res = await axios.get(`https://networkcalc.com/api/dns/whois/${domain}`, { timeout: 30000 });
       if (res.data && res.data.status === 'OK' && res.data.whois) {
         rawData = res.data.whois.record || JSON.stringify(res.data.whois);
         

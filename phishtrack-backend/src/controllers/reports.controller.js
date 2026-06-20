@@ -91,6 +91,7 @@ exports.generateReport = async (req, res, next) => {
         version: version,
         pdf_url: `/api/reports/${reportId}/pdf`,
         supabase_path: supabasePath,
+        pdf_buffer: pdfBuffer,
         digital_signature: digitalSignature,
         generatedById: user.id,
         generated_at: generatedAt
@@ -190,7 +191,13 @@ exports.downloadPdf = async (req, res, next) => {
       }
     }
 
-    return res.status(404).json({ error: 'PDF not available in cloud storage' });
+    if (report.pdf_buffer) {
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `inline; filename="PhishTrack_Report_${report.case.case_number}.pdf"`);
+      return res.send(report.pdf_buffer);
+    }
+
+    return res.status(404).json({ error: 'PDF not available in cloud storage or database fallback' });
   } catch (err) {
     next(err);
   }
@@ -237,6 +244,11 @@ exports.verifyReport = async (req, res, next) => {
         fileExists = true;
         currentFileHash = crypto.createHash('sha256').update(cloudBuffer).digest('hex');
       }
+    }
+
+    if (!fileExists && report.pdf_buffer) {
+      fileExists = true;
+      currentFileHash = crypto.createHash('sha256').update(report.pdf_buffer).digest('hex');
     }
 
     const custody = await prisma.chainOfCustody.findFirst({

@@ -303,15 +303,20 @@ exports.generatePdfReport = (data) => {
         ['Expires', whois.expiryDate ? new Date(whois.expiryDate).toLocaleDateString() : null],
         ['Suspicious Age', whois.isSuspiciousAge ? 'YES — HIGH RISK' : 'No'],
       ];
-      whoisRows.forEach(([label, value], i) => {
-        const wx = MARGIN + (i % 2) * (CONTENT_W / 2 + 5);
-        const wy = y + Math.floor(i / 2) * 30;
-        doc.font('Helvetica-Bold').fontSize(8).fillColor(c.subtle).text(label + ':', wx, wy);
-        const isRisk = label === 'Suspicious Age' && whois.isSuspiciousAge;
-        doc.font('Helvetica').fontSize(9).fillColor(isRisk ? c.danger : c.textDark)
-           .text(String(value || 'Unknown'), wx, wy + 11, { width: CONTENT_W / 2 - 10 });
-      });
-      y += Math.ceil(whoisRows.length / 2) * 30 + 15;
+      if (caseData.target_type === 'IP') {
+        doc.font('Helvetica-Oblique').fontSize(9).fillColor(c.muted).text('WHOIS Domain Registry data is not applicable for IP addresses.', MARGIN, y);
+        y += 20;
+      } else {
+        whoisRows.forEach(([label, value], i) => {
+          const wx = MARGIN + (i % 2) * (CONTENT_W / 2 + 5);
+          const wy = y + Math.floor(i / 2) * 30;
+          doc.font('Helvetica-Bold').fontSize(8).fillColor(c.subtle).text(label + ':', wx, wy);
+          const isRisk = label === 'Suspicious Age' && whois.isSuspiciousAge;
+          doc.font('Helvetica').fontSize(9).fillColor(isRisk ? c.danger : c.textDark)
+             .text(String(value || 'Unknown'), wx, wy + 11, { width: CONTENT_W / 2 - 10 });
+        });
+        y += Math.ceil(whoisRows.length / 2) * 30 + 15;
+      }
 
       // Network & SSL
       y = sectionLabel('NETWORK & SSL DETAILS', y);
@@ -321,9 +326,9 @@ exports.generatePdfReport = (data) => {
         ['Resolved IP', geo.ip],
         ['Location', `${geo.city || '?'}, ${geo.country || '?'}`],
         ['ISP / Hosting', geo.isp],
-        ['SSL Valid', ssl.valid === true ? 'Valid (Secure)' : 'INVALID / Missing'],
-        ['SSL Issuer', ssl.issuer],
-        ['SSL Expiry', ssl.validTo ? ssl.validTo.toString().slice(0, 10) : null],
+        ['SSL Valid', caseData.target_type === 'IP' ? 'Skipped (IP)' : (ssl.valid === true ? 'Valid (Secure)' : 'INVALID / Missing')],
+        ['SSL Issuer', caseData.target_type === 'IP' ? 'N/A' : ssl.issuer],
+        ['SSL Expiry', caseData.target_type === 'IP' ? 'N/A' : (ssl.validTo ? ssl.validTo.toString().slice(0, 10) : null)],
       ];
       netRows.forEach(([label, value], i) => {
         const nx = MARGIN + (i % 2) * (CONTENT_W / 2 + 5);
@@ -338,45 +343,50 @@ exports.generatePdfReport = (data) => {
       // VirusTotal
       y = sectionLabel('VIRUSTOTAL MULTI-ENGINE SCAN', y);
       const vt = analysis.virustotal_result || {};
-      const malCount = vt.maliciousCount || 0;
-      const harmCount = vt.harmlessCount || 0;
-      const suspCount = vt.suspiciousCount || 0;
-      const totalEngines = vt.totalEngines || (malCount + harmCount + suspCount);
-
-      // Summary bar
-      doc.rect(MARGIN, y, CONTENT_W, 14).fill(c.lightBg);
-      if (totalEngines > 0) {
-        const malW = (malCount / totalEngines) * CONTENT_W;
-        const suspW = (suspCount / totalEngines) * CONTENT_W;
-        doc.rect(MARGIN, y, malW, 14).fill(c.danger);
-        doc.rect(MARGIN + malW, y, suspW, 14).fill(c.warning);
-      }
-      doc.fillColor(c.white).font('Helvetica-Bold').fontSize(7.5)
-         .text(`${malCount} Malicious  |  ${suspCount} Suspicious  |  ${harmCount} Harmless  |  Total: ${totalEngines} engines`, MARGIN + 8, y + 3);
-      y += 22;
-
-      const detections = vt.detections || [];
-      if (detections.length > 0) {
-        const dcols = [170, 150, 185];
-        y = drawTableHeader(['Engine', 'Category', 'Result'], dcols, MARGIN, y);
-        detections.slice(0, 10).forEach((d, i) => {
-          const isMal = (d.result || '').toLowerCase().includes('phish') || (d.result || '').toLowerCase().includes('malware');
-          y = drawTableRow(
-            [d.engine || 'Unknown', d.category || 'malicious', d.result || 'flagged'],
-            dcols, MARGIN, y, i,
-            [c.textDark, c.textDark, isMal ? c.danger : c.warning]
-          );
-        });
-        if (detections.length > 10) {
-          doc.font('Helvetica-Oblique').fontSize(7.5).fillColor(c.muted)
-             .text(`+ ${detections.length - 10} more detections not shown`, MARGIN, y + 4);
-          y += 14;
-        }
-        y += 10;
-      } else {
-        doc.font('Helvetica').fontSize(9).fillColor(malCount > 0 ? c.danger : c.success)
-           .text(malCount > 0 ? `${malCount} detections flagged. No breakdown available.` : 'No detections found by any engine.', MARGIN, y);
+      if (vt.error) {
+        doc.font('Helvetica').fontSize(9).fillColor(c.danger).text(`VirusTotal Scan Failed: ${vt.error}`, MARGIN, y);
         y += 20;
+      } else {
+        const malCount = vt.maliciousCount || 0;
+        const harmCount = vt.harmlessCount || 0;
+        const suspCount = vt.suspiciousCount || 0;
+        const totalEngines = vt.totalEngines || (malCount + harmCount + suspCount + (vt.undetectedCount || 0));
+
+        // Summary bar
+        doc.rect(MARGIN, y, CONTENT_W, 14).fill(c.lightBg);
+        if (totalEngines > 0) {
+          const malW = (malCount / totalEngines) * CONTENT_W;
+          const suspW = (suspCount / totalEngines) * CONTENT_W;
+          doc.rect(MARGIN, y, malW, 14).fill(c.danger);
+          doc.rect(MARGIN + malW, y, suspW, 14).fill(c.warning);
+        }
+        doc.fillColor(c.white).font('Helvetica-Bold').fontSize(7.5)
+           .text(`${malCount} Malicious  |  ${suspCount} Suspicious  |  ${harmCount} Harmless  |  Total: ${totalEngines} engines`, MARGIN + 8, y + 3);
+        y += 22;
+
+        const detections = vt.detections || [];
+        if (detections.length > 0) {
+          const dcols = [170, 150, 185];
+          y = drawTableHeader(['Engine', 'Category', 'Result'], dcols, MARGIN, y);
+          detections.slice(0, 10).forEach((d, i) => {
+            const isMal = (d.result || '').toLowerCase().includes('phish') || (d.result || '').toLowerCase().includes('malware');
+            y = drawTableRow(
+              [d.engine || 'Unknown', d.category || 'malicious', d.result || 'flagged'],
+              dcols, MARGIN, y, i,
+              [c.textDark, c.textDark, isMal ? c.danger : c.warning]
+            );
+          });
+          if (detections.length > 10) {
+            doc.font('Helvetica-Oblique').fontSize(7.5).fillColor(c.muted)
+               .text(`+ ${detections.length - 10} more detections not shown`, MARGIN, y + 4);
+            y += 14;
+          }
+          y += 10;
+        } else {
+          doc.font('Helvetica').fontSize(9).fillColor(malCount > 0 ? c.danger : c.success)
+             .text(malCount > 0 ? `${malCount} detections flagged. No breakdown available.` : 'No detections found by any engine.', MARGIN, y);
+          y += 20;
+        }
       }
 
       // Redirect chain
