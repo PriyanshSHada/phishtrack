@@ -67,7 +67,21 @@ exports.createCase = async (req, res, next) => {
     // under concurrent requests.
     const created = await prisma.$transaction(async (tx) => {
       const startOfYear = new Date(new Date().getFullYear(), 0, 1);
-      const seq = await tx.case.count({ where: { created_at: { gte: startOfYear } } });
+      
+      // Get the last created case this year to find the highest sequence
+      const lastCase = await tx.case.findFirst({
+        where: { created_at: { gte: startOfYear } },
+        orderBy: { created_at: 'desc' }
+      });
+      
+      let seq = 0;
+      if (lastCase && lastCase.case_number) {
+        const parts = lastCase.case_number.split('-');
+        if (parts.length === 3) {
+          seq = parseInt(parts[2], 10) || 0;
+        }
+      }
+      
       const caseNumber = generateCaseNumber(seq + 1);
 
       return tx.case.create({
