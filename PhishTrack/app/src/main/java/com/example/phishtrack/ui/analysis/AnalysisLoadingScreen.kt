@@ -1,6 +1,5 @@
 package com.example.phishtrack.ui.analysis
 
-import android.widget.Toast
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -9,9 +8,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.Text
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -29,6 +26,7 @@ import com.example.phishtrack.data.api.AnalysisResponse
 import com.example.phishtrack.data.repository.CasesRepository
 import com.example.phishtrack.ui.auth.UiState
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @Composable
 fun AnalysisLoadingScreen(
@@ -38,6 +36,9 @@ fun AnalysisLoadingScreen(
     onBackOnError: () -> Unit
 ) {
     val context = LocalContext.current
+    val snackbarHostState = remember { SnackbarHostState() }
+    val coroutineScope = rememberCoroutineScope()
+    
     var analysisResult by remember { mutableStateOf<UiState<AnalysisResponse>>(UiState.Loading) }
 
     // Simulated progress steps
@@ -46,6 +47,12 @@ fun AnalysisLoadingScreen(
     var step3Done by remember { mutableStateOf(false) }
     var step4Done by remember { mutableStateOf(false) }
     var step5Done by remember { mutableStateOf(false) }
+
+    // Calculate progress percentage
+    val progressPercentage = remember(step1Done, step2Done, step3Done, step4Done, step5Done) {
+        val completedSteps = listOf(step1Done, step2Done, step3Done, step4Done, step5Done).count { it }
+        (completedSteps * 20)
+    }
 
     // Start API request to run analysis
     LaunchedEffect(caseId) {
@@ -82,7 +89,10 @@ fun AnalysisLoadingScreen(
             }
             onAnalysisComplete(caseId)
         } else if (analysisResult is UiState.Error) {
-            Toast.makeText(context, (analysisResult as UiState.Error).message, Toast.LENGTH_LONG).show()
+            coroutineScope.launch {
+                snackbarHostState.showSnackbar("✗ ${(analysisResult as UiState.Error).message}")
+            }
+            delay(1500)
             onBackOnError()
         }
     }
@@ -116,7 +126,8 @@ fun AnalysisLoadingScreen(
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+            verticalArrangement = Arrangement.Center,
+            modifier = Modifier.fillMaxWidth()
         ) {
             // Rotating scanner circle
             Box(
@@ -149,7 +160,18 @@ fun AnalysisLoadingScreen(
                 )
             }
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // Progress percentage display
+            Text(
+                text = "$progressPercentage%",
+                color = Color(0x00, 0xF5, 0xFF),
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.Monospace
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
 
             Text(
                 text = "SANDBOX INVESTIGATION RUNNING",
@@ -177,20 +199,43 @@ fun AnalysisLoadingScreen(
                     .padding(20.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                ProgressStep(title = "Initialize Puppeteer Browser Sandbox", isDone = step1Done)
-                ProgressStep(title = "Fetch Page Content & Screenshot Evidence", isDone = step2Done)
-                ProgressStep(title = "Trace Redirect Chain & WHOIS Data", isDone = step3Done)
-                ProgressStep(title = "Scan Threat Records (VirusTotal)", isDone = step4Done)
-                ProgressStep(title = "Synthesize OpenAI GPT-4o Analysis", isDone = step5Done)
+                ProgressStep(title = "✦ Initialize Puppeteer Browser Sandbox", isDone = step1Done)
+                ProgressStep(title = "✦ Fetch Page Content & Screenshot Evidence", isDone = step2Done)
+                ProgressStep(title = "✦ Trace Redirect Chain & WHOIS Data", isDone = step3Done)
+                ProgressStep(title = "✦ Scan Threat Records (VirusTotal)", isDone = step4Done)
+                ProgressStep(title = "✦ Synthesize OpenAI GPT-4o Analysis", isDone = step5Done)
             }
         }
+
+        // Snackbar
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier.align(Alignment.BottomCenter)
+        )
     }
 }
 
 @Composable
 fun ProgressStep(title: String, isDone: Boolean) {
+    val infiniteTransition = rememberInfiniteTransition(label = "pulse_indicator")
+    val pulseAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.5f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(800, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulse_alpha"
+    )
+
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(
+                color = if (isDone) Color(0x00, 0xFF, 0x88).copy(alpha = 0.05f) else Color.Transparent,
+                shape = RoundedCornerShape(6.dp)
+            )
+            .padding(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         if (isDone) {
@@ -201,11 +246,19 @@ fun ProgressStep(title: String, isDone: Boolean) {
                 modifier = Modifier.size(20.dp)
             )
         } else {
-            CircularProgressIndicator(
-                color = Color(0x00, 0xF5, 0xFF),
-                strokeWidth = 2.dp,
-                modifier = Modifier.size(16.dp).padding(2.dp)
-            )
+            Box(
+                modifier = Modifier
+                    .size(16.dp)
+                    .clip(CircleShape)
+                    .background(Color(0x00, 0xF5, 0xFF).copy(alpha = pulseAlpha)),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator(
+                    color = Color(0x00, 0xF5, 0xFF),
+                    strokeWidth = 1.5.dp,
+                    modifier = Modifier.size(12.dp)
+                )
+            }
         }
         Spacer(modifier = Modifier.width(12.dp))
         Text(

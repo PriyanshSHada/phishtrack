@@ -269,28 +269,36 @@ fun ProfileScreen(
                     trailingContent = { Icon(Icons.Default.ChevronRight, contentDescription = "Go", tint = Color(0x88, 0x92, 0xB0)) },
                     modifier = Modifier.clickable {
                         coroutineScope.launch {
-                            casesRepository.refreshCases()
-                            val cases = casesRepository.cachedCasesFlow.firstOrNull() ?: emptyList()
-                            if (cases.isEmpty()) {
-                                Toast.makeText(context, "No cases to export", Toast.LENGTH_SHORT).show()
-                            } else {
-                                val csv = StringBuilder()
-                                csv.append("ID,Case Number,URL,Source,Priority,Status,Created At\n")
-                                cases.forEach { c ->
-                                    csv.append("${c.id},${c.caseNumber},${c.displayTarget()},${c.source},${c.priority},${c.status},${c.createdAt}\n")
+                            try {
+                                casesRepository.refreshCases()
+                                val cases = casesRepository.cachedCasesFlow.firstOrNull() ?: emptyList()
+                                if (cases.isEmpty()) {
+                                    snackbarHostState.showSnackbar("No cases to export")
+                                } else {
+                                    snackbarHostState.showSnackbar("Generating CSV export...")
+                                    val csv = StringBuilder()
+                                    csv.append("ID,Case Number,Target,Source,Priority,Status,Created At\n")
+                                    cases.forEach { c ->
+                                        val escapedTarget = c.displayTarget().replace(",", ";").replace("\n", " ")
+                                        val escapedTitle = (c.title ?: "").replace(",", ";").replace("\n", " ")
+                                        csv.append("${c.id},${c.caseNumber},\"$escapedTarget\",${c.source},${c.priority},${c.status},${c.createdAt}\n")
+                                    }
+                                    val timestamp = java.text.SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", java.util.Locale.getDefault()).format(java.util.Date())
+                                    val file = File(context.cacheDir, "PhishTrack_Cases_$timestamp.csv")
+                                    file.writeText(csv.toString())
+                                    val uri = FileProvider.getUriForFile(
+                                        context, "${context.packageName}.fileprovider", file
+                                    )
+                                    val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                        type = "text/csv"
+                                        putExtra(Intent.EXTRA_STREAM, uri)
+                                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                    }
+                                    snackbarHostState.showSnackbar("CSV ready: ${cases.size} cases exported")
+                                    context.startActivity(Intent.createChooser(shareIntent, "Export CSV"))
                                 }
-                                // Write CSV to cache file and share via FileProvider
-                                val file = File(context.cacheDir, "phishtrack_cases.csv")
-                                file.writeText(csv.toString())
-                                val uri = FileProvider.getUriForFile(
-                                    context, "${context.packageName}.fileprovider", file
-                                )
-                                val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                                    type = "text/csv"
-                                    putExtra(Intent.EXTRA_STREAM, uri)
-                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                }
-                                context.startActivity(Intent.createChooser(shareIntent, "Export CSV"))
+                            } catch (e: Exception) {
+                                snackbarHostState.showSnackbar("Export failed: ${e.message}")
                             }
                         }
                     },

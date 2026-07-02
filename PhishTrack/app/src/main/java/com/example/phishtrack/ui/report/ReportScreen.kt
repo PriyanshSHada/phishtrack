@@ -392,16 +392,25 @@ fun ReportScreen(
                                                 if (isSelected) statusColor else MaterialTheme.colorScheme.surfaceVariant,
                                                 RoundedCornerShape(6.dp)
                                             )
-                                            .clickable { viewModel.updateCaseStatus(s) }
+                                            .clickable(enabled = !updatingStatusState) { viewModel.updateCaseStatus(s) }
                                             .padding(horizontal = 4.dp, vertical = 8.dp),
                                         contentAlignment = Alignment.Center
                                     ) {
-                                        if (isSelected && updatingStatusState) {
-                                            CircularProgressIndicator(
-                                                color = statusColor,
-                                                modifier = Modifier.size(10.dp),
-                                                strokeWidth = 1.dp
-                                            )
+                                        if (updatingStatusState && isSelected) {
+                                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                                CircularProgressIndicator(
+                                                    color = statusColor,
+                                                    modifier = Modifier.size(14.dp),
+                                                    strokeWidth = 2.dp
+                                                )
+                                                Spacer(modifier = Modifier.height(2.dp))
+                                                Text(
+                                                    text = "Updating...",
+                                                    color = statusColor,
+                                                    fontSize = 7.sp,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                            }
                                         } else {
                                             Text(
                                                 text = s.replace("_", " "),

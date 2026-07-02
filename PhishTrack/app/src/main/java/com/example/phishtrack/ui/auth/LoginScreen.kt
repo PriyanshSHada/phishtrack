@@ -30,6 +30,7 @@ import androidx.biometric.BiometricPrompt
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
 import com.example.phishtrack.R
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -42,8 +43,12 @@ fun LoginScreen(
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
+    var emailError by remember { mutableStateOf("") }
+    var passwordError by remember { mutableStateOf("") }
     
     val context = LocalContext.current
+    val snackbarHostState = remember { SnackbarHostState() }
+    val coroutineScope = rememberCoroutineScope()
     val loginState by viewModel.loginState
 
     val showBiometricPrompt = {
@@ -54,7 +59,9 @@ fun LoginScreen(
                 object : BiometricPrompt.AuthenticationCallback() {
                     override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
                         super.onAuthenticationError(errorCode, errString)
-                        Toast.makeText(context, "Biometric authentication cancelled/failed", Toast.LENGTH_SHORT).show()
+                        coroutineScope.launch {
+                            snackbarHostState.showSnackbar("Biometric authentication cancelled/failed")
+                        }
                     }
 
                     override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
@@ -64,7 +71,9 @@ fun LoginScreen(
 
                     override fun onAuthenticationFailed() {
                         super.onAuthenticationFailed()
-                        Toast.makeText(context, "Biometric recognition failed.", Toast.LENGTH_SHORT).show()
+                        coroutineScope.launch {
+                            snackbarHostState.showSnackbar("Biometric recognition failed. Try again.")
+                        }
                     }
                 })
 
@@ -76,7 +85,9 @@ fun LoginScreen(
 
             biometricPrompt.authenticate(promptInfo)
         } else {
-            Toast.makeText(context, "Biometric login is not supported on this device.", Toast.LENGTH_SHORT).show()
+            coroutineScope.launch {
+                snackbarHostState.showSnackbar("Biometric login is not supported on this device.")
+            }
         }
     }
 
@@ -89,7 +100,9 @@ fun LoginScreen(
                 onLoginSuccess(email, null, null)
             }
             is UiState.Error -> {
-                Toast.makeText(context, (loginState as UiState.Error).message, Toast.LENGTH_LONG).show()
+                coroutineScope.launch {
+                    snackbarHostState.showSnackbar((loginState as UiState.Error).message)
+                }
                 viewModel.resetStates()
             }
             else -> {}
@@ -137,30 +150,41 @@ fun LoginScreen(
 
             Spacer(modifier = Modifier.height(40.dp))
 
-            // Email Input
+            // Email Input with error highlighting
             OutlinedTextField(
                 value = email,
-                onValueChange = { email = it },
+                onValueChange = { 
+                    email = it
+                    emailError = ""
+                },
                 label = { Text("Email Address") },
                 leadingIcon = { Icon(Icons.Default.Email, contentDescription = "Email", tint = Color(0x88, 0x92, 0xB0)) },
+                isError = emailError.isNotEmpty(),
                 singleLine = true,
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = Color(0x00, 0xF5, 0xFF), // Cyan
-                    unfocusedBorderColor = Color(0x2A, 0x35, 0x58), // Border Gray
+                    focusedBorderColor = if (emailError.isEmpty()) Color(0x00, 0xF5, 0xFF) else MaterialTheme.colorScheme.error,
+                    unfocusedBorderColor = if (emailError.isEmpty()) Color(0x2A, 0x35, 0x58) else MaterialTheme.colorScheme.error,
                     focusedLabelColor = Color(0x00, 0xF5, 0xFF),
                     unfocusedLabelColor = Color(0x88, 0x92, 0xB0),
                     focusedTextColor = Color.White,
-                    unfocusedTextColor = Color.White
+                    unfocusedTextColor = Color.White,
+                    errorBorderColor = MaterialTheme.colorScheme.error
                 ),
                 modifier = Modifier.fillMaxWidth()
             )
+            if (emailError.isNotEmpty()) {
+                Text(emailError, color = MaterialTheme.colorScheme.error, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp, start = 4.dp))
+            }
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Password Input
+            // Password Input with error highlighting
             OutlinedTextField(
                 value = password,
-                onValueChange = { password = it },
+                onValueChange = { 
+                    password = it
+                    passwordError = ""
+                },
                 label = { Text("Password") },
                 leadingIcon = { Icon(Icons.Default.Lock, contentDescription = "Password", tint = Color(0x88, 0x92, 0xB0)) },
                 trailingIcon = {
@@ -169,19 +193,24 @@ fun LoginScreen(
                         Icon(icon, contentDescription = "Toggle password visibility", tint = Color(0x88, 0x92, 0xB0))
                     }
                 },
+                isError = passwordError.isNotEmpty(),
                 singleLine = true,
                 visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = Color(0x00, 0xF5, 0xFF),
-                    unfocusedBorderColor = Color(0x2A, 0x35, 0x58),
+                    focusedBorderColor = if (passwordError.isEmpty()) Color(0x00, 0xF5, 0xFF) else MaterialTheme.colorScheme.error,
+                    unfocusedBorderColor = if (passwordError.isEmpty()) Color(0x2A, 0x35, 0x58) else MaterialTheme.colorScheme.error,
                     focusedLabelColor = Color(0x00, 0xF5, 0xFF),
                     unfocusedLabelColor = Color(0x88, 0x92, 0xB0),
                     focusedTextColor = Color.White,
-                    unfocusedTextColor = Color.White
+                    unfocusedTextColor = Color.White,
+                    errorBorderColor = MaterialTheme.colorScheme.error
                 ),
                 modifier = Modifier.fillMaxWidth()
             )
+            if (passwordError.isNotEmpty()) {
+                Text(passwordError, color = MaterialTheme.colorScheme.error, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp, start = 4.dp))
+            }
 
             Spacer(modifier = Modifier.height(28.dp))
 
@@ -191,9 +220,23 @@ fun LoginScreen(
             } else {
                 Button(
                     onClick = {
-                        if (email.trim().isEmpty() || password.trim().isEmpty()) {
-                            Toast.makeText(context, "Please fill in all fields", Toast.LENGTH_SHORT).show()
-                        } else {
+                        var isValid = true
+                        if (email.trim().isEmpty()) {
+                            emailError = "Email is required"
+                            isValid = false
+                        } else if (!email.contains("@")) {
+                            emailError = "Please enter a valid email"
+                            isValid = false
+                        }
+                        if (password.trim().isEmpty()) {
+                            passwordError = "Password is required"
+                            isValid = false
+                        } else if (password.length < 6) {
+                            passwordError = "Password must be at least 6 characters"
+                            isValid = false
+                        }
+                        
+                        if (isValid) {
                             viewModel.login(email.trim(), password.trim())
                         }
                     },
@@ -216,14 +259,16 @@ fun LoginScreen(
             Spacer(modifier = Modifier.height(24.dp))
 
             Card(
-                colors = CardDefaults.cardColors(containerColor = Color(0x14, 0x18, 0x29)), // Glassmorphism-style card
+                colors = CardDefaults.cardColors(containerColor = Color(0x14, 0x18, 0x29)),
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable {
                         if (viewModel.isBiometricEnabled()) {
                             showBiometricPrompt()
                         } else {
-                            Toast.makeText(context, "Biometric login is not enabled in settings.", Toast.LENGTH_LONG).show()
+                            coroutineScope.launch {
+                                snackbarHostState.showSnackbar("Biometric login is not enabled in settings.")
+                            }
                         }
                     }
             ) {
@@ -256,5 +301,11 @@ fun LoginScreen(
 
             Spacer(modifier = Modifier.height(48.dp))
         }
+
+        // Snackbar
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier.align(Alignment.BottomCenter)
+        )
     }
 }

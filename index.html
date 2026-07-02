@@ -7,6 +7,9 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
   <style>
+    * {
+      scroll-behavior: smooth;
+    }
     body {
       background-color: #0f172a; /* slate-900 */
       color: #f8fafc; /* slate-50 */
@@ -16,29 +19,58 @@
       background: rgba(30, 41, 59, 0.7); /* slate-800 with opacity */
       backdrop-filter: blur(10px);
       border: 1px solid rgba(255, 255, 255, 0.1);
+      transition: all 0.3s ease;
+    }
+    .glass-card:hover {
+      background: rgba(30, 41, 59, 0.9);
+      border-color: rgba(255, 255, 255, 0.2);
+      transform: translateY(-2px);
     }
     .gradient-text {
       background: linear-gradient(to right, #4ade80, #3b82f6);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
     }
+    .feature-card {
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .feature-card:hover {
+      transform: translateY(-6px);
+      box-shadow: 0 20px 25px -5px rgba(74, 222, 128, 0.1);
+    }
+    @media (max-width: 768px) {
+      .nav-links {
+        display: none;
+      }
+      .mobile-menu-toggle {
+        display: block;
+      }
+    }
+    @media (min-width: 769px) {
+      .mobile-menu-toggle {
+        display: none;
+      }
+    }
   </style>
 </head>
 <body class="min-h-screen flex flex-col">
 
   <!-- Navbar -->
-  <nav class="p-6 flex justify-between items-center border-b border-slate-800">
-    <div class="flex items-center space-x-3">
-      <div class="bg-green-400 text-slate-900 p-2 rounded-lg">
-        <i class="fa-solid fa-shield-halved text-xl"></i>
+  <nav class="p-6 flex justify-between items-center border-b border-slate-800" role="navigation" aria-label="Main navigation">
+    <a href="#" class="flex items-center space-x-3" aria-label="PhishTrack home">
+      <div class="bg-green-400 text-slate-900 p-2 rounded-lg" title="PhishTrack Security Shield">
+        <i class="fa-solid fa-shield-halved text-xl" aria-hidden="true"></i>
       </div>
       <span class="text-2xl font-bold tracking-wider">PhishTrack</span>
+    </a>
+    <div class="nav-links flex space-x-6">
+      <a href="#features" class="hover:text-green-400 transition" aria-label="View features">Features</a>
+      <a href="#stack" class="hover:text-green-400 transition" aria-label="View tech stack">Tech Stack</a>
+      <a href="presentation.html" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-md font-semibold transition shadow-lg shadow-blue-500/30" aria-label="Open presentation slides">View Presentation</a>
     </div>
-    <div class="hidden md:flex space-x-6">
-      <a href="#features" class="hover:text-green-400 transition">Features</a>
-      <a href="#stack" class="hover:text-green-400 transition">Tech Stack</a>
-      <a href="presentation.html" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-md font-semibold transition shadow-lg shadow-blue-500/30">View Presentation</a>
-    </div>
+    <button class="mobile-menu-toggle text-2xl" aria-label="Toggle mobile menu">
+      <i class="fa-solid fa-bars" aria-hidden="true"></i>
+    </button>
   </nav>
 
   <!-- Hero Section -->
@@ -68,31 +100,31 @@
       
       <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
         <!-- Feature 1 -->
-        <div class="glass-card p-8 rounded-2xl hover:-translate-y-2 transition duration-300">
-          <i class="fa-solid fa-microscope text-4xl text-blue-400 mb-6"></i>
-          <h3 class="text-xl font-bold mb-3">Automated OSINT</h3>
+        <article class="feature-card glass-card p-8 rounded-2xl">
+          <i class="fa-solid fa-microscope text-4xl text-blue-400 mb-6" aria-hidden="true"></i>
+          <h3 class="text-xl font-bold mb-3">🔍 Automated OSINT</h3>
           <p class="text-slate-400 text-sm leading-relaxed">
             Instant sandbox execution via VirusTotal, combined with WHOIS, SSL validation, IP geolocation, and homograph detection.
           </p>
-        </div>
+        </article>
         
         <!-- Feature 2 -->
-        <div class="glass-card p-8 rounded-2xl hover:-translate-y-2 transition duration-300">
-          <i class="fa-solid fa-file-pdf text-4xl text-red-400 mb-6"></i>
-          <h3 class="text-xl font-bold mb-3">Forensic Reports</h3>
+        <article class="feature-card glass-card p-8 rounded-2xl">
+          <i class="fa-solid fa-file-pdf text-4xl text-red-400 mb-6" aria-hidden="true"></i>
+          <h3 class="text-xl font-bold mb-3">📄 Forensic Reports</h3>
           <p class="text-slate-400 text-sm leading-relaxed">
             Generate tamper-proof, cryptographically signed PDF reports directly from the mobile app, securely stored in the cloud.
           </p>
-        </div>
+        </article>
 
         <!-- Feature 3 -->
-        <div class="glass-card p-8 rounded-2xl hover:-translate-y-2 transition duration-300">
-          <i class="fa-solid fa-earth-americas text-4xl text-green-400 mb-6"></i>
-          <h3 class="text-xl font-bold mb-3">Live Threat Map</h3>
+        <article class="feature-card glass-card p-8 rounded-2xl">
+          <i class="fa-solid fa-earth-americas text-4xl text-green-400 mb-6" aria-hidden="true"></i>
+          <h3 class="text-xl font-bold mb-3">🌍 Live Threat Map</h3>
           <p class="text-slate-400 text-sm leading-relaxed">
             Visualize global phishing campaigns, track incident trends, and monitor your SOC dashboard in real-time.
           </p>
-        </div>
+        </article>
       </div>
     </div>
   </section>
@@ -112,8 +144,36 @@
   </section>
 
   <!-- Footer -->
-  <footer class="p-8 text-center text-slate-500 border-t border-slate-800 text-sm">
-    <p>&copy; 2026 PhishTrack Project. Built for advanced threat analysis.</p>
+  <footer class="p-8 text-center text-slate-500 border-t border-slate-800 text-sm" role="contentinfo">
+    <div class="max-w-7xl mx-auto">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
+        <div>
+          <h4 class="text-white font-bold mb-4">Product</h4>
+          <ul class="space-y-2">
+            <li><a href="#features" class="hover:text-green-400 transition">Features</a></li>
+            <li><a href="presentation.html" class="hover:text-green-400 transition">Documentation</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4 class="text-white font-bold mb-4">Resources</h4>
+          <ul class="space-y-2">
+            <li><a href="https://github.com/PriyanshSHada/phishtrack" target="_blank" rel="noopener noreferrer" class="hover:text-green-400 transition">GitHub Repository</a></li>
+            <li><a href="#" class="hover:text-green-400 transition">API Docs</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4 class="text-white font-bold mb-4">Legal</h4>
+          <ul class="space-y-2">
+            <li><a href="#" class="hover:text-green-400 transition">Privacy Policy</a></li>
+            <li><a href="#" class="hover:text-green-400 transition">Terms of Service</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="border-t border-slate-700 pt-6">
+        <p>&copy; 2026 PhishTrack Project. Built for advanced threat analysis.</p>
+        <p class="mt-2 text-xs">Developed with <span style="color: #ff3b3b;">❤️</span> for SOC Security Teams</p>
+      </div>
+    </div>
   </footer>
 
 </body>

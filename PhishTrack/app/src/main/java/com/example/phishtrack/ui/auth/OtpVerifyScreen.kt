@@ -22,6 +22,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @Composable
 fun OtpVerifyScreen(
@@ -33,8 +34,11 @@ fun OtpVerifyScreen(
     var otpCode by remember { mutableStateOf("") }
     var timeLeft by remember { mutableIntStateOf(60) }
     var resendCount by remember { mutableIntStateOf(0) }
+    var isResendingOtp by remember { mutableStateOf(false) }
     
     val context = LocalContext.current
+    val snackbarHostState = remember { SnackbarHostState() }
+    val coroutineScope = rememberCoroutineScope()
     val otpVerifyState by viewModel.otpVerifyState
     val resendOtpState by viewModel.resendOtpState
 
@@ -51,12 +55,16 @@ fun OtpVerifyScreen(
         when (otpVerifyState) {
             is UiState.Success -> {
                 val data = (otpVerifyState as UiState.Success).data
-                Toast.makeText(context, "Verification successful!", Toast.LENGTH_SHORT).show()
+                coroutineScope.launch {
+                    snackbarHostState.showSnackbar("✓ Verification successful!")
+                }
                 viewModel.resetStates()
                 onVerificationSuccess(data.token, data.user?.id ?: "")
             }
             is UiState.Error -> {
-                Toast.makeText(context, (otpVerifyState as UiState.Error).message, Toast.LENGTH_LONG).show()
+                coroutineScope.launch {
+                    snackbarHostState.showSnackbar("✗ ${(otpVerifyState as UiState.Error).message}")
+                }
                 viewModel.resetStates()
             }
             else -> {}
@@ -66,11 +74,17 @@ fun OtpVerifyScreen(
     LaunchedEffect(resendOtpState) {
         when (resendOtpState) {
             is UiState.Success -> {
-                Toast.makeText(context, "OTP resent to your email", Toast.LENGTH_SHORT).show()
+                coroutineScope.launch {
+                    snackbarHostState.showSnackbar("✓ OTP resent to your email!")
+                }
+                isResendingOtp = false
                 viewModel.resetStates()
             }
             is UiState.Error -> {
-                Toast.makeText(context, (resendOtpState as UiState.Error).message, Toast.LENGTH_LONG).show()
+                coroutineScope.launch {
+                    snackbarHostState.showSnackbar("✗ ${(resendOtpState as UiState.Error).message}")
+                }
+                isResendingOtp = false
                 viewModel.resetStates()
             }
             else -> {}
@@ -172,25 +186,53 @@ fun OtpVerifyScreen(
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            // Timer & Resend Option
-            if (timeLeft > 0) {
-                Text(
-                    text = "Resend OTP in 0:${timeLeft.toString().padStart(2, '0')}",
-                    color = Color(0x88, 0x92, 0xB0),
-                    fontSize = 14.sp
-                )
-            } else {
-                Text(
-                    text = "Resend OTP Code",
-                    color = Color(0x00, 0xF5, 0xFF),
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.clickable {
-                        timeLeft = 60
-                        resendCount++
-                        viewModel.resendOtp(email)
+            // Timer & Resend Option with visual feedback
+            Card(
+                colors = CardDefaults.cardColors(containerColor = Color(0x1E, 0x24, 0x40)),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(12.dp)
+                ) {
+                    if (timeLeft > 0) {
+                        Text(
+                            text = "🕐 Resend OTP in 0:${timeLeft.toString().padStart(2, '0')}",
+                            color = Color(0x88, 0x92, 0xB0),
+                            fontSize = 14.sp
+                        )
+                    } else {
+                        if (isResendingOtp) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center
+                            ) {
+                                CircularProgressIndicator(color = Color(0x00, 0xF5, 0xFF), modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Sending OTP...",
+                                    color = Color(0x00, 0xF5, 0xFF),
+                                    fontSize = 14.sp
+                                )
+                            }
+                        } else {
+                            Text(
+                                text = "🔄 Resend OTP Code",
+                                color = Color(0x00, 0xF5, 0xFF),
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.clickable {
+                                    isResendingOtp = true
+                                    timeLeft = 60
+                                    resendCount++
+                                    viewModel.resendOtp(email)
+                                }
+                            )
+                        }
                     }
-                )
+                }
             }
 
             Spacer(modifier = Modifier.height(40.dp))
@@ -202,7 +244,9 @@ fun OtpVerifyScreen(
                 Button(
                     onClick = {
                         if (otpCode.length < 6) {
-                            Toast.makeText(context, "Please enter all 6 digits", Toast.LENGTH_SHORT).show()
+                            coroutineScope.launch {
+                                snackbarHostState.showSnackbar("Please enter all 6 digits")
+                            }
                         } else {
                             viewModel.verifyOtp(email, otpCode)
                         }
@@ -227,12 +271,18 @@ fun OtpVerifyScreen(
 
             // Back to Login
             Text(
-                text = "Back to Login",
+                text = "← Back to Login",
                 color = Color(0x88, 0x92, 0xB0),
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Medium,
                 modifier = Modifier.clickable { onBackToLogin() }
             )
         }
+
+        // Snackbar
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier.align(Alignment.BottomCenter)
+        )
     }
 }

@@ -1,5 +1,8 @@
 package com.example.phishtrack.ui.main
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -59,11 +62,19 @@ fun MainScreen(
                 NavigationBarItem(
                     selected = selectedTab == 0,
                     onClick = { selectedTab = 0 },
-                    icon = { Icon(Icons.Default.Dashboard, contentDescription = "Dashboard") },
+                    icon = { 
+                        Icon(
+                            Icons.Default.Dashboard, 
+                            contentDescription = "Dashboard",
+                            modifier = if (selectedTab == 0) Modifier else Modifier
+                        )
+                    },
                     label = { Text("Dashboard") },
                     colors = NavigationBarItemDefaults.colors(
                         selectedIconColor = Color(0x00, 0xF5, 0xFF),
                         selectedTextColor = Color(0x00, 0xF5, 0xFF),
+                        unselectedIconColor = Color(0x88, 0x92, 0xB0),
+                        unselectedTextColor = Color(0x88, 0x92, 0xB0),
                         indicatorColor = Color(0x1E, 0x24, 0x40)
                     )
                 )
@@ -71,11 +82,19 @@ fun MainScreen(
                 NavigationBarItem(
                     selected = selectedTab == 1,
                     onClick = { selectedTab = 1 },
-                    icon = { Icon(Icons.AutoMirrored.Filled.Assignment, contentDescription = "Cases") },
+                    icon = { 
+                        Icon(
+                            Icons.AutoMirrored.Filled.Assignment, 
+                            contentDescription = "Cases",
+                            modifier = if (selectedTab == 1) Modifier else Modifier
+                        )
+                    },
                     label = { Text("Cases") },
                     colors = NavigationBarItemDefaults.colors(
                         selectedIconColor = Color(0x00, 0xF5, 0xFF),
                         selectedTextColor = Color(0x00, 0xF5, 0xFF),
+                        unselectedIconColor = Color(0x88, 0x92, 0xB0),
+                        unselectedTextColor = Color(0x88, 0x92, 0xB0),
                         indicatorColor = Color(0x1E, 0x24, 0x40)
                     )
                 )
@@ -83,11 +102,19 @@ fun MainScreen(
                 NavigationBarItem(
                     selected = selectedTab == 2,
                     onClick = { selectedTab = 2 },
-                    icon = { Icon(Icons.Default.Person, contentDescription = "Profile") },
+                    icon = { 
+                        Icon(
+                            Icons.Default.Person, 
+                            contentDescription = "Profile",
+                            modifier = if (selectedTab == 2) Modifier else Modifier
+                        )
+                    },
                     label = { Text("Profile") },
                     colors = NavigationBarItemDefaults.colors(
                         selectedIconColor = Color(0x00, 0xF5, 0xFF),
                         selectedTextColor = Color(0x00, 0xF5, 0xFF),
+                        unselectedIconColor = Color(0x88, 0x92, 0xB0),
+                        unselectedTextColor = Color(0x88, 0x92, 0xB0),
                         indicatorColor = Color(0x1E, 0x24, 0x40)
                     )
                 )
@@ -96,8 +123,13 @@ fun MainScreen(
         containerColor = Color(0x0A, 0x0E, 0x1A)
     ) { paddingValues ->
         Box(modifier = Modifier.padding(paddingValues)) {
-            when (selectedTab) {
-                0 -> DashboardScreen(
+            // Dashboard Tab with fade animation
+            AnimatedVisibility(
+                visible = selectedTab == 0,
+                enter = fadeIn(),
+                exit = fadeOut()
+            ) {
+                DashboardScreen(
                     analystName = analystName,
                     viewModel = dashboardViewModel,
                     onNewCaseClick = onNewCaseClick,
@@ -113,12 +145,28 @@ fun MainScreen(
                         selectedTab = 1
                     }
                 )
-                1 -> CasesListScreen(
+            }
+
+            // Cases Tab with fade animation
+            AnimatedVisibility(
+                visible = selectedTab == 1,
+                enter = fadeIn(),
+                exit = fadeOut()
+            ) {
+                CasesListScreen(
                     initialDateFilter = selectedDateFilter,
                     onClearDateFilter = { selectedDateFilter = null },
                     onCaseClick = onCaseClick
                 )
-                2 -> ProfileScreen(
+            }
+
+            // Profile Tab with fade animation
+            AnimatedVisibility(
+                visible = selectedTab == 2,
+                enter = fadeIn(),
+                exit = fadeOut()
+            ) {
+                ProfileScreen(
                     authRepository = authRepository,
                     casesRepository = casesRepository,
                     onLogoutClick = onLogoutClick

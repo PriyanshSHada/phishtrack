@@ -28,6 +28,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -41,19 +42,28 @@ fun SignUpScreen(
     var org by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
+    var nameError by remember { mutableStateOf("") }
+    var emailError by remember { mutableStateOf("") }
+    var passwordError by remember { mutableStateOf("") }
 
     val context = LocalContext.current
+    val snackbarHostState = remember { SnackbarHostState() }
+    val coroutineScope = rememberCoroutineScope()
     val registerState by viewModel.registerState
 
     LaunchedEffect(registerState) {
         when (registerState) {
             is UiState.Success -> {
-                Toast.makeText(context, "Registration successful! Please login.", Toast.LENGTH_SHORT).show()
+                coroutineScope.launch {
+                    snackbarHostState.showSnackbar("✓ Registration successful! Redirecting to login...")
+                }
                 viewModel.resetStates()
                 onRegisterSuccess()
             }
             is UiState.Error -> {
-                Toast.makeText(context, (registerState as UiState.Error).message, Toast.LENGTH_LONG).show()
+                coroutineScope.launch {
+                    snackbarHostState.showSnackbar("✗ ${(registerState as UiState.Error).message}")
+                }
                 viewModel.resetStates()
             }
             else -> {}
@@ -66,7 +76,7 @@ fun SignUpScreen(
             .background(Color(0x0A, 0x0E, 0x1A))
             .verticalScroll(rememberScrollState())
             .padding(24.dp),
-        contentAlignment = Alignment.Center
+        contentAlignment = Alignment.TopCenter
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -100,43 +110,59 @@ fun SignUpScreen(
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            // Name
+            // Name with error highlighting
             OutlinedTextField(
                 value = name,
-                onValueChange = { name = it },
+                onValueChange = { 
+                    name = it
+                    nameError = ""
+                },
                 label = { Text("Full Name") },
                 leadingIcon = { Icon(Icons.Default.Person, contentDescription = "Name", tint = Color(0x88, 0x92, 0xB0)) },
+                isError = nameError.isNotEmpty(),
                 singleLine = true,
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = Color(0x00, 0xF5, 0xFF),
-                    unfocusedBorderColor = Color(0x2A, 0x35, 0x58),
+                    focusedBorderColor = if (nameError.isEmpty()) Color(0x00, 0xF5, 0xFF) else MaterialTheme.colorScheme.error,
+                    unfocusedBorderColor = if (nameError.isEmpty()) Color(0x2A, 0x35, 0x58) else MaterialTheme.colorScheme.error,
                     focusedLabelColor = Color(0x00, 0xF5, 0xFF),
                     unfocusedLabelColor = Color(0x88, 0x92, 0xB0),
                     focusedTextColor = Color.White,
-                    unfocusedTextColor = Color.White
+                    unfocusedTextColor = Color.White,
+                    errorBorderColor = MaterialTheme.colorScheme.error
                 ),
                 modifier = Modifier.fillMaxWidth()
             )
+            if (nameError.isNotEmpty()) {
+                Text(nameError, color = MaterialTheme.colorScheme.error, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp, start = 4.dp))
+            }
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Email
+            // Email with error highlighting
             OutlinedTextField(
                 value = email,
-                onValueChange = { email = it },
+                onValueChange = { 
+                    email = it
+                    emailError = ""
+                },
                 label = { Text("Email Address") },
                 leadingIcon = { Icon(Icons.Default.Email, contentDescription = "Email", tint = Color(0x88, 0x92, 0xB0)) },
+                isError = emailError.isNotEmpty(),
                 singleLine = true,
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = Color(0x00, 0xF5, 0xFF),
-                    unfocusedBorderColor = Color(0x2A, 0x35, 0x58),
+                    focusedBorderColor = if (emailError.isEmpty()) Color(0x00, 0xF5, 0xFF) else MaterialTheme.colorScheme.error,
+                    unfocusedBorderColor = if (emailError.isEmpty()) Color(0x2A, 0x35, 0x58) else MaterialTheme.colorScheme.error,
                     focusedLabelColor = Color(0x00, 0xF5, 0xFF),
                     unfocusedLabelColor = Color(0x88, 0x92, 0xB0),
                     focusedTextColor = Color.White,
-                    unfocusedTextColor = Color.White
+                    unfocusedTextColor = Color.White,
+                    errorBorderColor = MaterialTheme.colorScheme.error
                 ),
                 modifier = Modifier.fillMaxWidth()
             )
+            if (emailError.isNotEmpty()) {
+                Text(emailError, color = MaterialTheme.colorScheme.error, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp, start = 4.dp))
+            }
 
             Spacer(modifier = Modifier.height(16.dp))
 
@@ -160,10 +186,13 @@ fun SignUpScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Password
+            // Password with error highlighting
             OutlinedTextField(
                 value = password,
-                onValueChange = { password = it },
+                onValueChange = { 
+                    password = it
+                    passwordError = ""
+                },
                 label = { Text("Password") },
                 leadingIcon = { Icon(Icons.Default.Lock, contentDescription = "Password", tint = Color(0x88, 0x92, 0xB0)) },
                 trailingIcon = {
@@ -172,18 +201,31 @@ fun SignUpScreen(
                         Icon(icon, contentDescription = "Toggle password visibility", tint = Color(0x88, 0x92, 0xB0))
                     }
                 },
+                isError = passwordError.isNotEmpty(),
                 singleLine = true,
                 visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = Color(0x00, 0xF5, 0xFF),
-                    unfocusedBorderColor = Color(0x2A, 0x35, 0x58),
+                    focusedBorderColor = if (passwordError.isEmpty()) Color(0x00, 0xF5, 0xFF) else MaterialTheme.colorScheme.error,
+                    unfocusedBorderColor = if (passwordError.isEmpty()) Color(0x2A, 0x35, 0x58) else MaterialTheme.colorScheme.error,
                     focusedLabelColor = Color(0x00, 0xF5, 0xFF),
                     unfocusedLabelColor = Color(0x88, 0x92, 0xB0),
                     focusedTextColor = Color.White,
-                    unfocusedTextColor = Color.White
+                    unfocusedTextColor = Color.White,
+                    errorBorderColor = MaterialTheme.colorScheme.error
                 ),
                 modifier = Modifier.fillMaxWidth()
+            )
+            if (passwordError.isNotEmpty()) {
+                Text(passwordError, color = MaterialTheme.colorScheme.error, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp, start = 4.dp))
+            }
+
+            // Password strength hint
+            Text(
+                text = "💡 Minimum 8 characters for security",
+                color = Color(0x88, 0x92, 0xB0),
+                fontSize = 11.sp,
+                modifier = Modifier.padding(top = 8.dp, start = 4.dp).align(Alignment.Start)
             )
 
             Spacer(modifier = Modifier.height(32.dp))
@@ -194,9 +236,27 @@ fun SignUpScreen(
             } else {
                 Button(
                     onClick = {
-                        if (name.trim().isEmpty() || email.trim().isEmpty() || password.trim().isEmpty()) {
-                            Toast.makeText(context, "Please fill in all required fields", Toast.LENGTH_SHORT).show()
-                        } else {
+                        var isValid = true
+                        if (name.trim().isEmpty()) {
+                            nameError = "Name is required"
+                            isValid = false
+                        }
+                        if (email.trim().isEmpty()) {
+                            emailError = "Email is required"
+                            isValid = false
+                        } else if (!email.contains("@")) {
+                            emailError = "Please enter a valid email"
+                            isValid = false
+                        }
+                        if (password.trim().isEmpty()) {
+                            passwordError = "Password is required"
+                            isValid = false
+                        } else if (password.length < 8) {
+                            passwordError = "Password must be at least 8 characters"
+                            isValid = false
+                        }
+                        
+                        if (isValid) {
                             viewModel.register(name.trim(), email.trim(), org.trim().ifEmpty { null }, password.trim())
                         }
                     },
@@ -229,5 +289,11 @@ fun SignUpScreen(
 
             Spacer(modifier = Modifier.height(48.dp))
         }
+
+        // Snackbar
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier.align(Alignment.BottomCenter)
+        )
     }
 }

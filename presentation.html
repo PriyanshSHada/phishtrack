@@ -15,9 +15,37 @@
     .reveal h4 { color: #facc15; }
     .highlight { color: #60a5fa; font-weight: bold; }
     ul { list-style-type: square; }
-    li { margin-bottom: 15px; font-size: 0.9em; }
-    .badge { background: #333; padding: 5px 15px; border-radius: 20px; font-size: 0.6em; display: inline-block; margin: 5px; border: 1px solid #555; }
-    .slide-content { text-align: left; background: rgba(255,255,255,0.05); padding: 30px; border-radius: 10px; margin-top: 20px; }
+    li { margin-bottom: 15px; font-size: 0.9em; transition: all 0.3s ease; }
+    li:hover { transform: translateX(10px); color: #4ade80; }
+    .badge { 
+      background: linear-gradient(135deg, #333 0%, #1a1a1a 100%); 
+      padding: 8px 16px; 
+      border-radius: 20px; 
+      font-size: 0.65em; 
+      display: inline-block; 
+      margin: 6px; 
+      border: 1.5px solid #555; 
+      transition: all 0.3s ease;
+      cursor: pointer;
+    }
+    .badge:hover { 
+      background: linear-gradient(135deg, #4ade80 0%, #3b82f6 100%); 
+      border-color: #4ade80; 
+      transform: scale(1.1);
+    }
+    .slide-content { 
+      text-align: left; 
+      background: linear-gradient(135deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02)); 
+      padding: 30px; 
+      border-radius: 10px; 
+      margin-top: 20px; 
+      border: 1px solid rgba(74, 222, 128, 0.2);
+      transition: all 0.3s ease;
+    }
+    .slide-content:hover {
+      border-color: rgba(74, 222, 128, 0.4);
+      background: linear-gradient(135deg, rgba(255,255,255,0.12), rgba(255,255,255,0.04));
+    }
   </style>
 </head>
 <body>

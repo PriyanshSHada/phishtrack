@@ -271,10 +271,10 @@ fun MetricsGrid(stats: StatsResponse) {
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        MetricCard(title = "High Risk", value = stats.highRisk.toString(), color = Color(0xFF, 0x3B, 0x3B), modifier = Modifier.weight(1f))
-        MetricCard(title = "Cases", value = stats.cases.toString(), color = Color(0x00, 0xF5, 0xFF), modifier = Modifier.weight(1f))
-        MetricCard(title = "Scans", value = stats.analyses.toString(), color = Color(0x00, 0xFF, 0x88), modifier = Modifier.weight(1f))
-        MetricCard(title = "Reports", value = stats.reports.toString(), color = Color(0xFF, 0xA5, 0x00), modifier = Modifier.weight(1f))
+        MetricCard(title = "High Risk", value = stats.highRisk.toString(), color = Color(0xFF, 0x3B, 0x3B), modifier = Modifier.weight(1f), trend = "↑")
+        MetricCard(title = "Cases", value = stats.cases.toString(), color = Color(0x00, 0xF5, 0xFF), modifier = Modifier.weight(1f), trend = "↑")
+        MetricCard(title = "Scans", value = stats.analyses.toString(), color = Color(0x00, 0xFF, 0x88), modifier = Modifier.weight(1f), trend = "↑")
+        MetricCard(title = "Reports", value = stats.reports.toString(), color = Color(0xFF, 0xA5, 0x00), modifier = Modifier.weight(1f), trend = "↑")
     }
 }
 
@@ -298,7 +298,7 @@ fun MetricsGridPlaceholder() {
 }
 
 @Composable
-fun MetricCard(title: String, value: String, color: Color, modifier: Modifier = Modifier) {
+fun MetricCard(title: String, value: String, color: Color, modifier: Modifier = Modifier, trend: String? = null) {
     Card(
         shape = RoundedCornerShape(8.dp),
         colors = CardDefaults.cardColors(containerColor = Color.Transparent),
@@ -322,13 +322,29 @@ fun MetricCard(title: String, value: String, color: Color, modifier: Modifier = 
                 fontWeight = FontWeight.Medium
             )
             Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = value,
-                color = color,
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold,
-                fontFamily = FontFamily.Monospace
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = value,
+                    color = color,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Monospace
+                )
+                if (trend != null) {
+                    val trendIcon = if (trend.startsWith("↑")) "↑" else "↓"
+                    val trendColor = if (trend.startsWith("↑")) Color(0x00, 0xFF, 0x88) else Color(0xFF, 0x3B, 0x3B)
+                    Text(
+                        text = trendIcon,
+                        color = trendColor,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
         }
     }
 }

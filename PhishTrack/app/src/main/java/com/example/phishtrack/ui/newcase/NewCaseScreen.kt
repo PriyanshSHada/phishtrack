@@ -2,13 +2,13 @@ package com.example.phishtrack.ui.newcase
 
 import android.content.ClipboardManager
 import android.content.Context
-import android.widget.Toast
 import androidx.compose.animation.*
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
@@ -42,6 +42,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import kotlinx.coroutines.launch
 
 @Composable
 fun SectionHeader(title: String) {
@@ -86,6 +87,8 @@ fun NewCaseScreen(
     val scrollState = rememberScrollState()
     val focusManager = LocalFocusManager.current
     val haptic = LocalHapticFeedback.current
+    val snackbarHostState = remember { SnackbarHostState() }
+    val coroutineScope = rememberCoroutineScope()
 
     LaunchedEffect(submitResetTrigger) {
         if (submitResetTrigger > 0) isSubmitting = false
@@ -137,6 +140,9 @@ fun NewCaseScreen(
         modifier = Modifier.background(Brush.verticalGradient(
             colors = listOf(Color(0xFF0F172A), Color(0xFF020617))
         )),
+        snackbarHost = {
+            SnackbarHost(hostState = snackbarHostState)
+        },
         topBar = {
             TopAppBar(
                 title = {
@@ -275,7 +281,17 @@ fun NewCaseScreen(
                             if (!text.isNullOrEmpty()) {
                                 targetInput = text.toString()
                                 hasAttemptedSubmit = false
-                                Toast.makeText(context, "Pasted from clipboard", Toast.LENGTH_SHORT).show()
+                                coroutineScope.launch {
+                                    snackbarHostState.showSnackbar("Pasted from clipboard")
+                                }
+                            } else {
+                                coroutineScope.launch {
+                                    snackbarHostState.showSnackbar("Clipboard is empty")
+                                }
+                            }
+                        } else {
+                            coroutineScope.launch {
+                                snackbarHostState.showSnackbar("Clipboard is empty")
                             }
                         }
                     }) {
@@ -320,7 +336,7 @@ fun NewCaseScreen(
             )
 
             Spacer(modifier = Modifier.height(32.dp))
-            Divider(color = MaterialTheme.colorScheme.surfaceVariant, thickness = 1.dp)
+            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant, thickness = 1.dp)
             Spacer(modifier = Modifier.height(16.dp))
 
             SectionHeader("CASE DETAILS")
@@ -388,7 +404,9 @@ fun NewCaseScreen(
 
             val sources = listOf("Email", "WhatsApp", "SMS", "Social_Media", "Other")
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 sources.forEach { source ->
@@ -406,7 +424,7 @@ fun NewCaseScreen(
                             )
                             .clickable { selectedSource = source; haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove) }
                             .padding(horizontal = 14.dp, vertical = 10.dp)
-                            .weight(1f),
+                            .widthIn(min = 92.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(

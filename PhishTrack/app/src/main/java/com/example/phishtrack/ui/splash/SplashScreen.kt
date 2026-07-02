@@ -3,21 +3,28 @@ package com.example.phishtrack.ui.splash
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -35,6 +42,20 @@ fun SplashScreen(
     onNavigateNext: (isLoggedIn: Boolean) -> Unit,
     onUpdateRequired: (updateUrl: String) -> Unit
 ) {
+    var loadingProgress by remember { mutableFloatStateOf(0.12f) }
+    var loadingStatus by remember { mutableStateOf("Starting secure workspace") }
+    var taglineVisible by remember { mutableStateOf(false) }
+    val progress by animateFloatAsState(
+        targetValue = loadingProgress,
+        animationSpec = tween(durationMillis = 420, easing = FastOutSlowInEasing),
+        label = "splashProgress"
+    )
+    val taglineAlpha by animateFloatAsState(
+        targetValue = if (taglineVisible) 1f else 0f,
+        animationSpec = tween(durationMillis = 700, easing = FastOutSlowInEasing),
+        label = "taglineAlpha"
+    )
+
     val infiniteTransition = rememberInfiniteTransition(label = "shield_pulse")
     val pulse by infiniteTransition.animateFloat(
         initialValue = 0f,
@@ -47,8 +68,12 @@ fun SplashScreen(
     )
 
     LaunchedEffect(Unit) {
+        taglineVisible = true
+        loadingStatus = "Checking app integrity"
+        loadingProgress = 0.28f
         try {
             val minVersionResult = authRepository.checkVersion().first()
+            loadingProgress = 0.52f
             if (minVersionResult.isSuccess) {
                 val config = minVersionResult.getOrNull()
                 if (config != null && BuildConfig.VERSION_CODE < config.minimumRequiredVersion) {
@@ -60,8 +85,13 @@ fun SplashScreen(
             // Ignore network errors on splash to allow offline fallback
         }
 
+        loadingStatus = "Restoring secure session"
+        loadingProgress = 0.76f
         delay(2000)
         val token = tokenManager.getToken()
+        loadingStatus = if (token.isNullOrEmpty()) "Preparing sign in" else "Unlocking dashboard"
+        loadingProgress = 1f
+        delay(260)
         onNavigateNext(!token.isNullOrEmpty())
     }
 
@@ -140,10 +170,31 @@ fun SplashScreen(
             // Tagline
             Text(
                 text = "Forensic Link Analyzer",
-                color = Color(0x88, 0x92, 0xB0), // #8892B0 Muted Gray-Blue
+                color = Color(0x88, 0x92, 0xB0).copy(alpha = taglineAlpha), // #8892B0 Muted Gray-Blue
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Light,
                 letterSpacing = 1.sp
+            )
+
+            Spacer(modifier = Modifier.height(28.dp))
+
+            LinearProgressIndicator(
+                progress = { progress },
+                modifier = Modifier
+                    .fillMaxWidth(0.62f)
+                    .height(4.dp),
+                color = Color(0x00, 0xF5, 0xFF),
+                trackColor = Color(0x2A, 0x35, 0x58)
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Text(
+                text = loadingStatus,
+                color = Color(0x88, 0x92, 0xB0),
+                fontSize = 12.sp,
+                fontFamily = FontFamily.Monospace,
+                textAlign = TextAlign.Center
             )
         }
     }

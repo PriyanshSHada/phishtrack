@@ -1,8 +1,14 @@
 package com.example.phishtrack.ui.dashboard
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -13,17 +19,25 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.phishtrack.data.api.WeeklyGraphData
 import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import java.time.format.TextStyle
+import java.util.Locale
 
 data class HeatmapDay(
     val date: String,
@@ -80,6 +94,7 @@ fun WeeklyHeatmapSection(
     val heatmapDays = remember(weeklyData) {
         buildHeatmapData(weeklyData)
     }
+    var selectedDay by remember(heatmapDays) { mutableStateOf<HeatmapDay?>(heatmapDays.lastOrNull()) }
 
     val totalScans = remember(heatmapDays) { heatmapDays.sumOf { it.count } }
     val activeDays = remember(heatmapDays) { heatmapDays.count { it.count > 0 } }
@@ -187,23 +202,44 @@ fun WeeklyHeatmapSection(
                         horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         week.forEach { day ->
-                            val cellColor = heatmapColor(day.count)
+                            val isSelected = selectedDay?.date == day.date
+                            val cellColor by animateColorAsState(
+                                targetValue = if (isSelected) Color(0xFF00F5FF) else heatmapColor(day.count),
+                                animationSpec = tween(durationMillis = 180),
+                                label = "heatmapCellColor"
+                            )
+                            val cellScale by animateFloatAsState(
+                                targetValue = if (isSelected) 1.08f else 1f,
+                                animationSpec = tween(durationMillis = 180),
+                                label = "heatmapCellScale"
+                            )
                             val textColor = heatmapTextColor(day.count)
 
                             Box(
                                 modifier = Modifier
                                     .weight(1f)
                                     .aspectRatio(1f)
+                                    .scale(cellScale)
                                     .background(
                                         color = cellColor,
                                         shape = RoundedCornerShape(4.dp)
                                     )
-                                    .clickable { onDateSelected(day.date) }
+                                    .pointerInput(day) {
+                                        detectTapGestures(
+                                            onTap = {
+                                                selectedDay = day
+                                                onDateSelected(day.date)
+                                            },
+                                            onLongPress = {
+                                                selectedDay = day
+                                            }
+                                        )
+                                    }
                                     .then(
-                                        if (day.isToday)
+                                        if (isSelected || day.isToday)
                                             Modifier.border(
-                                                width = 1.5.dp,
-                                                color = Color(0xFF00F5FF),
+                                                width = if (isSelected) 2.dp else 1.5.dp,
+                                                color = if (isSelected) Color.White else Color(0xFF00F5FF),
                                                 shape = RoundedCornerShape(4.dp)
                                             )
                                         else Modifier
@@ -213,9 +249,9 @@ fun WeeklyHeatmapSection(
                                 if (day.count > 0) {
                                     Text(
                                         text = day.count.toString(),
-                                        color = textColor,
+                                        color = if (isSelected) Color(0xFF0D1120) else textColor,
                                         fontSize = 9.sp,
-                                        fontWeight = FontWeight.Medium
+                                        fontWeight = FontWeight.Bold
                                     )
                                 }
                             }
@@ -226,6 +262,18 @@ fun WeeklyHeatmapSection(
                         }
                     }
                     Spacer(modifier = Modifier.height(4.dp))
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                AnimatedVisibility(
+                    visible = selectedDay != null,
+                    enter = fadeIn(animationSpec = tween(180)),
+                    exit = fadeOut(animationSpec = tween(120))
+                ) {
+                    selectedDay?.let { day ->
+                        HeatmapSelectionDetails(day = day)
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(10.dp))
@@ -289,6 +337,66 @@ fun WeeklyHeatmapSection(
                 iconTint = Color(0xFF00F5FF),
                 value = activeDays.toString(),
                 label = "active days"
+            )
+        }
+    }
+}
+
+@Composable
+private fun HeatmapSelectionDetails(day: HeatmapDay) {
+    val parsedDate = remember(day.date) {
+        runCatching { LocalDate.parse(day.date) }.getOrNull()
+    }
+    val title = remember(day.date) {
+        parsedDate?.let {
+            val formatter = DateTimeFormatter.ofPattern("MMM d, yyyy")
+            "${it.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.getDefault())}, ${it.format(formatter)}"
+        } ?: day.date
+    }
+    val activityLabel = when {
+        day.count == 0 -> "No scans recorded"
+        day.count == 1 -> "1 scan recorded"
+        else -> "${day.count} scans recorded"
+    }
+    val statusColor = when {
+        day.count == 0 -> Color(0xFF8892B0)
+        day.count <= 2 -> Color(0xFF00B8CC)
+        day.count <= 5 -> Color(0xFF00D4E8)
+        else -> Color(0xFF00F5FF)
+    }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color(0xFF0D1120), RoundedCornerShape(8.dp))
+            .border(1.dp, statusColor.copy(alpha = 0.35f), RoundedCornerShape(8.dp))
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                color = Color(0xFFE2E8F0),
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium
+            )
+            Text(
+                text = if (day.isToday) "Today" else activityLabel,
+                color = Color(0xFF8892B0),
+                fontSize = 10.sp
+            )
+        }
+        Box(
+            modifier = Modifier
+                .background(statusColor.copy(alpha = 0.14f), RoundedCornerShape(20.dp))
+                .padding(horizontal = 10.dp, vertical = 4.dp)
+        ) {
+            Text(
+                text = activityLabel,
+                color = statusColor,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold
             )
         }
     }
