@@ -1,4 +1,4 @@
-# 🎣 PhishTrack - AI-Powered Phishing Detection & Cyber Security Intelligence
+# PhishTrack – Phishing Threat Tracking & Analysis Console
 
 ![Build Status](https://img.shields.io/badge/build-passing-brightgreen)
 ![Platform](https://img.shields.io/badge/platform-Android-3DDC84)
