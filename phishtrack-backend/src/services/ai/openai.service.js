@@ -1,29 +1,34 @@
 const logger = require('../../utils/logger');
 
+const DEFAULT_FIREWORKS_BASE_URL = 'https://api.fireworks.ai/inference/v1';
+const DEFAULT_FIREWORKS_MODEL = 'accounts/fireworks/models/glm-5p2';
+
 exports.analyzeWithAi = async (analysisData) => {
-  const apiKey = process.env.OPENAI_API_KEY;
+  const apiKey = process.env.FIREWORKS_API_KEY;
+  const apiBase = process.env.FIREWORKS_API_BASE || DEFAULT_FIREWORKS_BASE_URL;
+  const model = process.env.FIREWORKS_MODEL || DEFAULT_FIREWORKS_MODEL;
   if (!apiKey) {
-    logger.warn('OpenAI API key not configured');
+    logger.warn('Fireworks API key not configured');
     return {
       threat_score: 50,
       severity: 'Medium',
       confidence: 30,
-      indicators: ['OpenAI API Key not configured — manual review required'],
+      indicators: ['Fireworks API Key not configured — manual review required'],
       techniques: [],
       mitre_techniques: [],
-      ai_summary: 'AI analysis could not run because the OpenAI API key is missing. Threat score defaults to 50. Please review the forensic artifacts manually.'
+      ai_summary: 'AI analysis could not run because the Fireworks API key is missing. Threat score defaults to 50. Please review the forensic artifacts manually.'
     };
   }
 
   try {
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    const response = await fetch(`${apiBase}/chat/completions`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: 'gpt-4o',
+        model,
         response_format: { type: 'json_object' },
         messages: [
           {
@@ -80,13 +85,13 @@ Produce a complete forensic JSON assessment as specified.`
 
     if (!response.ok) {
       const errBody = await response.text().catch(() => '');
-      throw new Error(`OpenAI API responded with status ${response.status}: ${errBody.slice(0, 200)}`);
+      throw new Error(`Fireworks API responded with status ${response.status}: ${errBody.slice(0, 200)}`);
     }
 
     const data = await response.json();
     const content = data.choices?.[0]?.message?.content;
     if (!content) {
-      throw new Error('OpenAI returned an empty or null response content');
+      throw new Error('Fireworks returned an empty or null response content');
     }
     const parsed = JSON.parse(content);
 
@@ -102,7 +107,7 @@ Produce a complete forensic JSON assessment as specified.`
       ai_summary: parsed.ai_summary || ''
     };
   } catch (err) {
-    logger.error('OpenAI Analysis Error', { error: err.message, stack: err.stack, url: analysisData.url });
+    logger.error('Fireworks Analysis Error', { error: err.message, stack: err.stack, url: analysisData.url });
     return {
       threat_score: 50,
       confidence: 20,
