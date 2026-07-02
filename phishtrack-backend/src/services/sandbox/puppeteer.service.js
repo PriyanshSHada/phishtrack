@@ -53,7 +53,8 @@ exports.runSandbox = async (url) => {
     } catch (apiErr) {
       logger.warn('ScreenshotOne failed/missing, falling back to thum.io', { url: currentUrl });
       try {
-        const fallbackUrl = `https://image.thum.io/get/width/1280/crop/720/${currentUrl}`;
+        const fallbackTarget = encodeURIComponent(currentUrl);
+        const fallbackUrl = `https://image.thum.io/get/width/1280/crop/720/${fallbackTarget}`;
         const fallbackRes = await axios.get(fallbackUrl, {
           responseType: 'arraybuffer',
           timeout: 35000

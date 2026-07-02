@@ -31,8 +31,8 @@ function setupAnalysisMocks() {
     .post('/api/v3/urls').reply(200, { data: { id: 'scan-123' } })
     .persist();
 
-  // OpenAI
-  nock('https://api.openai.com').post('/v1/chat/completions').reply(200, {
+  // Fireworks AI
+  nock('https://api.fireworks.ai').post('/inference/v1/chat/completions').reply(200, {
     choices: [{
       message: {
         content: JSON.stringify({
@@ -56,7 +56,9 @@ beforeAll(async () => {
   await resetDatabase();
   setupAnalysisMocks();
 
-  process.env.OPENAI_API_KEY = 'sk-test-key';
+  process.env.FIREWORKS_API_KEY = 'sk-test-key';
+  process.env.FIREWORKS_API_BASE = 'https://api.fireworks.ai/inference/v1';
+  process.env.FIREWORKS_MODEL = 'accounts/fireworks/models/glm-5p2';
   process.env.VIRUSTOTAL_API_KEY = 'vt-test-key';
 
   const result = await makeUser({ email: 'analysis-test@example.com' });
@@ -79,7 +81,9 @@ beforeAll(async () => {
 
 afterAll(async () => {
   nock.cleanAll();
-  delete process.env.OPENAI_API_KEY;
+  delete process.env.FIREWORKS_API_KEY;
+  delete process.env.FIREWORKS_API_BASE;
+  delete process.env.FIREWORKS_MODEL;
   delete process.env.VIRUSTOTAL_API_KEY;
   await prisma.$disconnect();
 });
@@ -132,7 +136,7 @@ describe('Analysis Routes — Integration', () => {
       nock.cleanAll();
       nock('http://ip-api.com').get(/\/json\/.*/).reply(500, {}).persist();
       nock('https://www.virustotal.com').get(/\/api\/v3\/urls\/.*/).reply(500, {}).persist();
-      nock('https://api.openai.com').post('/v1/chat/completions').reply(500, {}).persist();
+      nock('https://api.fireworks.ai').post('/inference/v1/chat/completions').reply(500, {}).persist();
 
       const res = await request(app)
         .post('/api/analysis/run')

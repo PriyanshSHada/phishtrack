@@ -25,3 +25,10 @@ PhishTrack/.gradle/
 PhishTrack/.kotlin/
 PhishTrack/local.properties
 PhishTrack/.idea/
+
+# General Junk & Outputs
+temp_response.txt
+test_output.txt
+jest_full_output.txt
+*.pdf
+!docs/*.pdf

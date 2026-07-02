@@ -183,16 +183,7 @@ fun DashboardScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Weekly Graph Chart
-            Text(
-                text = "WEEKLY SCAN ANALYTICS",
-                color = Color(0x88, 0x92, 0xB0),
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 1.sp,
-                modifier = Modifier.padding(bottom = 8.dp)
-            )
-            
+            // Weekly Graph Chart — title is rendered inside WeeklyHeatmapSection
             when (weeklyGraphState) {
                 is UiState.Success -> {
                     val weeklyData = (weeklyGraphState as UiState.Success).data
@@ -305,11 +296,11 @@ fun MetricCard(title: String, value: String, color: Color, modifier: Modifier = 
         modifier = modifier
             .background(
                 brush = Brush.linearGradient(
-                    colors = listOf(Color(0x1A, 0xFF, 0xFF, 0xFF), Color(0x05, 0xFF, 0xFF, 0xFF))
+                    colors = listOf(Color(0xFF141829), Color(0xFF0D1020))
                 ),
                 shape = RoundedCornerShape(8.dp)
             )
-            .border(1.dp, Color(0x2A, 0x35, 0x58), RoundedCornerShape(8.dp))
+            .border(1.dp, color.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
     ) {
         Column(
             modifier = Modifier.padding(12.dp),
@@ -317,7 +308,7 @@ fun MetricCard(title: String, value: String, color: Color, modifier: Modifier = 
         ) {
             Text(
                 text = title,
-                color = Color(0x88, 0x92, 0xB0),
+                color = Color(0xFF8892B0),
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Medium
             )
@@ -330,7 +321,7 @@ fun MetricCard(title: String, value: String, color: Color, modifier: Modifier = 
                 Text(
                     text = value,
                     color = color,
-                    fontSize = 20.sp,
+                    fontSize = 22.sp,
                     fontWeight = FontWeight.Bold,
                     fontFamily = FontFamily.Monospace
                 )
@@ -363,7 +354,7 @@ fun ThreatRadarMapCard(locations: List<ThreatLocation>) {
             colors = CardDefaults.cardColors(containerColor = Color(0xFF, 0xFF, 0xFF)),
             modifier = Modifier
                 .fillMaxWidth()
-                .height(if (selectedThreat != null) 420.dp else 240.dp)
+                .height(240.dp)
                 .border(1.dp, Color(0x2A, 0x35, 0x58), RoundedCornerShape(12.dp))
                 .clip(RoundedCornerShape(12.dp))
         ) {
@@ -491,20 +482,11 @@ fun ThreatRadarMapCard(locations: List<ThreatLocation>) {
                     }
                 )
 
-                // ── Threat Detail Overlay Panel ──
-                if (selectedThreat != null) {
-                    Box(modifier = Modifier.align(Alignment.BottomCenter)) {
-                        selectedThreat?.let { threat -> ThreatOverlay(threat) {
-                            selectedThreat = null
-                        }}
-                    }
-                }
-
-                // Zoom buttons — top right
+                // Zoom buttons — top right (always on top of map, never behind overlay)
                 Column(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .padding(horizontal = 8.dp, vertical = if (selectedThreat != null) 8.dp else 40.dp),
+                        .padding(horizontal = 8.dp, vertical = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     MapZoomButton("+") { mapRef?.animateCamera(CameraUpdateFactory.zoomIn()) }
@@ -512,6 +494,7 @@ fun ThreatRadarMapCard(locations: List<ThreatLocation>) {
                     MapZoomButton("⊟") {
                         mapRef?.animateCamera(CameraUpdateFactory.newCameraPosition(
                             CameraPosition.Builder().target(LatLng(20.0, 10.0)).zoom(1.0).build()))
+                        selectedThreat = null
                     }
                 }
 
@@ -535,6 +518,14 @@ fun ThreatRadarMapCard(locations: List<ThreatLocation>) {
                         )
                     }
                 }
+            }
+        }
+
+        // ── Threat Detail Panel — BELOW map, never overlapping controls ──
+        if (selectedThreat != null) {
+            Spacer(modifier = Modifier.height(8.dp))
+            selectedThreat?.let { threat ->
+                ThreatOverlay(threat) { selectedThreat = null }
             }
         }
     }

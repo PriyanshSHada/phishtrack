@@ -1,10 +1,12 @@
-const whois = require('whois');
 const axios = require('axios');
 const logger = require('../../utils/logger');
 
-function lookupWhois(domain) {
+async function lookupWhois(domain) {
+  const whoisModule = await import('whois');
+  const whoisClient = whoisModule.default || whoisModule;
+
   return new Promise((resolve, reject) => {
-    whois.lookup(domain, (err, data) => {
+    whoisClient.lookup(domain, (err, data) => {
       if (err) return reject(err);
       resolve(data);
     });
@@ -43,7 +45,12 @@ exports.getWhoisData = async (urlStr) => {
     } catch (restErr) {
       logger.warn('NetworkCalc WHOIS failed, falling back to raw whois', { error: restErr.message });
       // 2. Fallback to raw port 43 whois lookup
-      rawData = await lookupWhois(domain);
+      try {
+        rawData = await lookupWhois(domain);
+      } catch (whoisErr) {
+        logger.warn('Raw WHOIS lookup failed', { error: whoisErr.message, domain });
+        rawData = '';
+      }
     }
     
     // Parse raw whois text using regex for any missing fields

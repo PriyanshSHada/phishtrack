@@ -3,7 +3,7 @@
 const nock = require('nock');
 const openaiService = require('../../../src/services/ai/openai.service');
 
-const OPENAI_API = 'https://api.openai.com';
+const FIREWORKS_API = 'https://api.fireworks.ai';
 const FAKE_KEY = 'sk-test-1234567890';
 
 const SAMPLE_DATA = {
@@ -22,7 +22,9 @@ const makeOpenAiResponse = (content) => ({
 
 beforeEach(() => {
   nock.cleanAll();
-  delete process.env.OPENAI_API_KEY;
+  delete process.env.FIREWORKS_API_KEY;
+  delete process.env.FIREWORKS_API_BASE;
+  delete process.env.FIREWORKS_MODEL;
 });
 
 afterAll(() => nock.cleanAll());
@@ -36,7 +38,7 @@ describe('openai.service', () => {
   });
 
   test('U42 — successful GPT response parses all fields correctly', async () => {
-    process.env.OPENAI_API_KEY = FAKE_KEY;
+    process.env.FIREWORKS_API_KEY = FAKE_KEY;
     const gptContent = {
       threat_score: 88,
       severity: 'Critical',
@@ -44,7 +46,7 @@ describe('openai.service', () => {
       techniques: ['typosquatting', 'redirect-chain'],
       ai_summary: 'This is a high-confidence phishing site.'
     };
-    nock(OPENAI_API).post('/v1/chat/completions').reply(200, makeOpenAiResponse(gptContent));
+    nock(FIREWORKS_API).post('/inference/v1/chat/completions').reply(200, makeOpenAiResponse(gptContent));
 
     const result = await openaiService.analyzeWithAi(SAMPLE_DATA);
     expect(result.threat_score).toBe(88);
@@ -55,8 +57,8 @@ describe('openai.service', () => {
   });
 
   test('U43 — GPT returns non-JSON content falls back to defaults', async () => {
-    process.env.OPENAI_API_KEY = FAKE_KEY;
-    nock(OPENAI_API).post('/v1/chat/completions').reply(200, {
+    process.env.FIREWORKS_API_KEY = FAKE_KEY;
+    nock(FIREWORKS_API).post('/inference/v1/chat/completions').reply(200, {
       choices: [{ message: { content: 'I cannot provide a JSON response here.' } }]
     });
 
@@ -65,9 +67,9 @@ describe('openai.service', () => {
     expect(result.severity).toBe('Medium');
   });
 
-  test('U44 — OpenAI HTTP 500 falls back to default with error in indicators', async () => {
-    process.env.OPENAI_API_KEY = FAKE_KEY;
-    nock(OPENAI_API).post('/v1/chat/completions').reply(500, { error: 'Server Error' });
+  test('U44 — Fireworks HTTP 500 falls back to default with error in indicators', async () => {
+    process.env.FIREWORKS_API_KEY = FAKE_KEY;
+    nock(FIREWORKS_API).post('/inference/v1/chat/completions').reply(500, { error: 'Server Error' });
 
     const result = await openaiService.analyzeWithAi(SAMPLE_DATA);
     expect(result.threat_score).toBe(50);
@@ -75,7 +77,7 @@ describe('openai.service', () => {
   });
 
   test('U45 — threat_score returned as string "75" is coerced to number 75', async () => {
-    process.env.OPENAI_API_KEY = FAKE_KEY;
+    process.env.FIREWORKS_API_KEY = FAKE_KEY;
     const gptContent = {
       threat_score: '75',
       severity: 'High',
@@ -83,7 +85,7 @@ describe('openai.service', () => {
       techniques: [],
       ai_summary: 'Moderate threat.'
     };
-    nock(OPENAI_API).post('/v1/chat/completions').reply(200, makeOpenAiResponse(gptContent));
+    nock(FIREWORKS_API).post('/inference/v1/chat/completions').reply(200, makeOpenAiResponse(gptContent));
 
     const result = await openaiService.analyzeWithAi(SAMPLE_DATA);
     expect(result.threat_score).toBe(75);
@@ -91,9 +93,9 @@ describe('openai.service', () => {
   });
 
   test('U45b — missing indicators/techniques fields default to empty arrays', async () => {
-    process.env.OPENAI_API_KEY = FAKE_KEY;
+    process.env.FIREWORKS_API_KEY = FAKE_KEY;
     const gptContent = { threat_score: 60, severity: 'Medium', ai_summary: 'ok' };
-    nock(OPENAI_API).post('/v1/chat/completions').reply(200, makeOpenAiResponse(gptContent));
+    nock(FIREWORKS_API).post('/inference/v1/chat/completions').reply(200, makeOpenAiResponse(gptContent));
 
     const result = await openaiService.analyzeWithAi(SAMPLE_DATA);
     expect(Array.isArray(result.indicators)).toBe(true);

@@ -61,8 +61,9 @@ fun SignUpScreen(
                 onRegisterSuccess()
             }
             is UiState.Error -> {
+                val message = (registerState as UiState.Error).message
                 coroutineScope.launch {
-                    snackbarHostState.showSnackbar("✗ ${(registerState as UiState.Error).message}")
+                    snackbarHostState.showSnackbar("✗ $message")
                 }
                 viewModel.resetStates()
             }

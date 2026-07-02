@@ -100,8 +100,9 @@ fun LoginScreen(
                 onLoginSuccess(email, null, null)
             }
             is UiState.Error -> {
+                val message = (loginState as UiState.Error).message
                 coroutineScope.launch {
-                    snackbarHostState.showSnackbar((loginState as UiState.Error).message)
+                    snackbarHostState.showSnackbar(message)
                 }
                 viewModel.resetStates()
             }

@@ -34,6 +34,14 @@ exports.generatePdfReport = (data) => {
       const confidence = analysis.confidence || 50;
       const verdict = analysis.verdict || 'Suspicious';
       const brandImpersonated = analysis.brand_impersonated || null;
+      const whoisData = analysis.whois_data || analysis.whois || {};
+      const ipGeoData = analysis.ip_geolocation || analysis.ipGeo || {};
+      const sslData = analysis.ssl_info || analysis.ssl || {};
+      const redirectChain = analysis.redirect_chain || analysis.redirectChain || [caseData.url || caseData.target_ip || 'N/A'];
+      const screenshotData = analysis.page_screenshot || analysis.screenshot || null;
+      const indicators = analysis.ai_indicators || analysis.indicators || [];
+      const techniques = analysis.ai_techniques || analysis.techniques || [];
+      const virustotalData = analysis.virustotal_result || analysis.virustotal || {};
       const mitreTechniques = (() => {
         try {
           if (Array.isArray(analysis.mitre_techniques)) return analysis.mitre_techniques;
@@ -236,7 +244,6 @@ exports.generatePdfReport = (data) => {
 
       // Threat indicators
       y = sectionLabel('THREAT INDICATORS', y);
-      const indicators = analysis.ai_indicators || [];
       if (indicators.length === 0) {
         doc.font('Helvetica-Oblique').fontSize(9).fillColor(c.muted).text('No specific indicators flagged.', MARGIN, y);
         y += 20;
@@ -254,7 +261,6 @@ exports.generatePdfReport = (data) => {
 
       // Attack techniques
       y = sectionLabel('DETECTED ATTACK TECHNIQUES', y);
-      const techniques = analysis.ai_techniques || [];
       if (techniques.length === 0) {
         doc.font('Helvetica-Oblique').fontSize(9).fillColor(c.muted).text('No specific techniques identified.', MARGIN, y);
         y += 20;
@@ -294,7 +300,7 @@ exports.generatePdfReport = (data) => {
 
       // WHOIS / IP Registry
       y = sectionLabel(caseData.target_type === 'IP' ? 'IP REGISTRY INFORMATION' : 'WHOIS DOMAIN REGISTRY', y);
-      const whois = analysis.whois_data || {};
+      const whois = whoisData;
       const whoisRows = [
         [caseData.target_type === 'IP' ? 'Owner / ISP' : 'Registrar', whois.registrar],
         ['Country', whois.country],
@@ -315,8 +321,8 @@ exports.generatePdfReport = (data) => {
 
       // Network & SSL
       y = sectionLabel('NETWORK & SSL DETAILS', y);
-      const geo = analysis.ip_geolocation || {};
-      const ssl = analysis.ssl_info || {};
+      const geo = ipGeoData;
+      const ssl = sslData;
       const netRows = [
         ['Resolved IP', geo.ip],
         ['Location', `${geo.city || '?'}, ${geo.country || '?'}`],
@@ -337,7 +343,7 @@ exports.generatePdfReport = (data) => {
 
       // VirusTotal
       y = sectionLabel('VIRUSTOTAL MULTI-ENGINE SCAN', y);
-      const vt = analysis.virustotal_result || {};
+      const vt = virustotalData;
       if (vt.error) {
         doc.font('Helvetica').fontSize(9).fillColor(c.danger).text(`VirusTotal Scan Failed: ${vt.error}`, MARGIN, y);
         y += 20;
@@ -387,7 +393,7 @@ exports.generatePdfReport = (data) => {
       // Redirect chain
       if (y > 680) { doc.addPage(); drawPageHeader('FORENSIC ARTIFACT ANALYSIS (CONT.)'); y = 45; }
       y = sectionLabel('REDIRECT CHAIN TRACE', y);
-      const chain = analysis.redirect_chain || [caseData.url || caseData.target_ip || 'N/A'];
+      const chain = redirectChain;
       chain.forEach((url, i) => {
         const isFinal = i === chain.length - 1;
         const prefix = isFinal ? '[FINAL]' : `[HOP ${i + 1}]`;
@@ -400,7 +406,7 @@ exports.generatePdfReport = (data) => {
       y += 10;
 
       // Screenshot
-      const screenshot = analysis.page_screenshot;
+      const screenshot = screenshotData;
       if (screenshot && screenshot.startsWith('data:image/png;base64,')) {
         if (y > 600) { doc.addPage(); drawPageHeader('EVIDENCE SCREENSHOT'); y = 45; }
         y = sectionLabel('EVIDENCE SCREENSHOT (BROWSER SANDBOX CAPTURE)', y);

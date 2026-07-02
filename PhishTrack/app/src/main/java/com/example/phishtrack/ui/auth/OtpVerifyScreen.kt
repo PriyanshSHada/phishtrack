@@ -62,8 +62,9 @@ fun OtpVerifyScreen(
                 onVerificationSuccess(data.token, data.user?.id ?: "")
             }
             is UiState.Error -> {
+                val message = (otpVerifyState as UiState.Error).message
                 coroutineScope.launch {
-                    snackbarHostState.showSnackbar("✗ ${(otpVerifyState as UiState.Error).message}")
+                    snackbarHostState.showSnackbar("✗ $message")
                 }
                 viewModel.resetStates()
             }
@@ -81,8 +82,9 @@ fun OtpVerifyScreen(
                 viewModel.resetStates()
             }
             is UiState.Error -> {
+                val message = (resendOtpState as UiState.Error).message
                 coroutineScope.launch {
-                    snackbarHostState.showSnackbar("✗ ${(resendOtpState as UiState.Error).message}")
+                    snackbarHostState.showSnackbar("✗ $message")
                 }
                 isResendingOtp = false
                 viewModel.resetStates()

@@ -25,7 +25,7 @@ import javax.inject.Singleton
 @InstallIn(SingletonComponent::class)
 object AppModule {
 
-    private const val BASE_URL = "https://phishtrack.onrender.com/"
+    private const val BASE_URL = "https://site--phishtrack--7mpblxd7byyt.code.run/"
 
     @Provides
     @Singleton
@@ -37,7 +37,11 @@ object AppModule {
     @Singleton
     fun provideOkHttpClient(tokenManager: TokenManager): OkHttpClient {
         val loggingInterceptor = HttpLoggingInterceptor().apply {
-            level = HttpLoggingInterceptor.Level.BODY
+            level = if (com.example.phishtrack.BuildConfig.DEBUG) {
+                HttpLoggingInterceptor.Level.BASIC
+            } else {
+                HttpLoggingInterceptor.Level.NONE
+            }
         }
 
         // Attaches Bearer token to every authenticated request

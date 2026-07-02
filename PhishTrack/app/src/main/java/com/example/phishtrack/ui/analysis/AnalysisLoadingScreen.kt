@@ -89,8 +89,9 @@ fun AnalysisLoadingScreen(
             }
             onAnalysisComplete(caseId)
         } else if (analysisResult is UiState.Error) {
+            val message = (analysisResult as UiState.Error).message
             coroutineScope.launch {
-                snackbarHostState.showSnackbar("✗ ${(analysisResult as UiState.Error).message}")
+                snackbarHostState.showSnackbar("✗ $message")
             }
             delay(1500)
             onBackOnError()
