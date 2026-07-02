@@ -204,7 +204,7 @@ fun AnalysisLoadingScreen(
                 ProgressStep(title = "✦ Fetch Page Content & Screenshot Evidence", isDone = step2Done)
                 ProgressStep(title = "✦ Trace Redirect Chain & WHOIS Data", isDone = step3Done)
                 ProgressStep(title = "✦ Scan Threat Records (VirusTotal)", isDone = step4Done)
-                ProgressStep(title = "✦ Synthesize OpenAI GPT-4o Analysis", isDone = step5Done)
+                ProgressStep(title = "✦ Synthesize Fireworks AI Analysis", isDone = step5Done)
             }
         }
 
