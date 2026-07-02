@@ -1,21 +1,21 @@
-# 🎣 PhishTrack
+# 🎣 PhishTrack - AI-Powered Phishing Detection & Cyber Security Intelligence
 
 ![Build Status](https://img.shields.io/badge/build-passing-brightgreen)
 ![Platform](https://img.shields.io/badge/platform-Android-3DDC84)
 ![Backend](https://img.shields.io/badge/backend-Node.js-339933)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 
-**PhishTrack** is an advanced, AI-powered Cyber Security Intelligence platform designed to analyze, track, and report on phishing campaigns and malicious domains in real-time. It features a native Android application paired with a robust Node.js backend.
+**PhishTrack** is an advanced, open-source **Cyber Security Intelligence and Phishing Detection platform**. Designed for security researchers, SOC analysts, and everyday users, it analyzes malicious domains, tracks phishing campaigns, and generates automated forensic reports in real-time. By leveraging **OSINT (Open Source Intelligence)** and **Generative AI**, PhishTrack provides enterprise-grade threat intelligence through a native Android application and a robust Node.js REST API.
 
 ---
 
-## 🚀 Features
+## 🚀 Key Features for Threat Intelligence
 
-- **Real-Time Threat Analysis:** Analyzes URLs and IPs using AI and OSINT tools (Whois, IP Geo, SSL Certificates).
-- **AI-Powered Assessments:** Integrates with Fireworks AI for deep forensic evaluations and MITRE ATT&CK technique mapping.
-- **Forensic Reporting:** Automatically generates and signs cryptographically secure PDF reports for chain-of-custody preservation.
-- **Interactive Dashboard:** Global heatmaps and weekly scan analytics presented in a beautiful, modern Dark-Mode UI.
-- **Secure Authentication:** Features JWT-based authentication with OTP email verification.
+- **Real-Time Phishing Analysis:** Deep-scan URLs and IPs using automated OSINT tools (Whois, IP Geolocation, SSL Certificate validation).
+- **AI-Powered Forensics:** Integrates with Fireworks AI for deep malware analysis, contextual threat assessments, and MITRE ATT&CK technique mapping.
+- **Chain-of-Custody Reporting:** Automatically generates and cryptographically signs PDF forensic reports for legal and incident response teams.
+- **Interactive Global Dashboard:** Visualize cyber threats with live heatmaps and weekly scan analytics presented in a beautiful Dark-Mode UI.
+- **Secure Architecture:** Features JWT-based authentication with OTP email verification to protect investigative data.
 
 ---
 
