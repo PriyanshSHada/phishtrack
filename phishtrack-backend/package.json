@@ -4,7 +4,7 @@
   "description": "Backend API for PhishTrack",
   "main": "src/index.js",
   "scripts": {
-    "start": "npx prisma migrate deploy && node src/index.js",
+    "start": "node src/index.js",
     "dev": "nodemon src/index.js",
     "compose:up": "docker compose up -d",
     "compose:down": "docker compose down",
