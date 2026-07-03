@@ -33,7 +33,7 @@ cron.schedule('0 0 * * *', async () => {
       where: { id: { in: ids } }
     });
 
-    logger.info(\Successfully auto-deleted \ expired cases.\);
+    logger.info(`Successfully auto-deleted ${result.count} expired cases.`);
   } catch (error) {
     logger.error('Error during auto-deletion of expired cases:', error);
   }
