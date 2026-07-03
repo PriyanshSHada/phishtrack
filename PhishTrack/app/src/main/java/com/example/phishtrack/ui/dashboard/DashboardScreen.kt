@@ -56,9 +56,16 @@ import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
+import org.maplibre.android.style.expressions.Expression
 import org.maplibre.android.style.expressions.Expression.get
+import org.maplibre.android.style.expressions.Expression.eq
+import org.maplibre.android.style.expressions.Expression.literal
+import org.maplibre.android.style.expressions.Expression.has
+import org.maplibre.android.style.expressions.Expression.toNumber
 import org.maplibre.android.style.layers.CircleLayer
+import org.maplibre.android.style.layers.SymbolLayer
 import org.maplibre.android.style.layers.PropertyFactory.*
+import org.maplibre.android.style.sources.GeoJsonOptions
 import org.maplibre.android.style.sources.GeoJsonSource
 import org.maplibre.geojson.Feature
 import org.maplibre.geojson.FeatureCollection
@@ -446,25 +453,76 @@ fun ThreatRadarMapCard(locations: List<ThreatLocation>, modifier: Modifier = Mod
                                                     "medium" -> "#FFA500"
                                                     else -> "#00CC66"
                                                 })
+                                                // Numeric severity for cluster color pick (highest wins)
+                                                addProperty("severity", when (priorityStr) {
+                                                    "critical" -> 4
+                                                    "high" -> 3
+                                                    "medium" -> 2
+                                                    else -> 1
+                                                })
                                                 addProperty("score", loc.threatScore ?: 0)
                                                 addProperty("index", idx)
                                             }
-                                            // Add small random jitter so overlapping markers (same IP) are visible
-                                            val jitterLat = (Math.random() - 0.5) * 2.0
-                                            val jitterLng = (Math.random() - 0.5) * 2.0
                                             Feature.fromGeometry(
-                                                Point.fromLngLat((loc.longitude ?: 0.0) + jitterLng, (loc.latitude ?: 0.0) + jitterLat),
+                                                Point.fromLngLat(loc.longitude ?: 0.0, loc.latitude ?: 0.0),
                                                 props
                                             )
                                         } else null
                                     }
 
+                                    // Clustered GeoJson source — MapLibre merges nearby pins automatically
                                     style.addSource(
-                                        GeoJsonSource("threats",
-                                            FeatureCollection.fromFeatures(features))
+                                        GeoJsonSource(
+                                            "threats",
+                                            FeatureCollection.fromFeatures(features),
+                                            GeoJsonOptions()
+                                                .withCluster(true)
+                                                .withClusterRadius(50)       // px radius to merge
+                                                .withClusterMaxZoom(12)       // stop clustering at zoom 12+
+                                        )
                                     )
+
+                                    // ── Layer 1: Cluster circle (big glow ring) ─────────────────
+                                    style.addLayer(
+                                        CircleLayer("cluster-glow", "threats")
+                                            .withFilter(has("point_count"))   // only clusters
+                                            .withProperties(
+                                                circleRadius(24f),
+                                                circleColor("#FF3B3B"),
+                                                circleOpacity(0.20f),
+                                                circleBlur(0.8f)
+                                            )
+                                    )
+
+                                    // ── Layer 2: Cluster circle (solid badge) ───────────────────
+                                    style.addLayer(
+                                        CircleLayer("cluster-circle", "threats")
+                                            .withFilter(has("point_count"))
+                                            .withProperties(
+                                                circleRadius(16f),
+                                                circleColor("#FF3B3B"),
+                                                circleStrokeColor("#FFFFFF"),
+                                                circleStrokeWidth(2f)
+                                            )
+                                    )
+
+                                    // ── Layer 3: Cluster count label ("3", "7" etc.) ────────────
+                                    style.addLayer(
+                                        SymbolLayer("cluster-count", "threats")
+                                            .withFilter(has("point_count"))
+                                            .withProperties(
+                                                textField(Expression.toString(get("point_count"))),
+                                                textSize(13f),
+                                                textColor("#FFFFFF"),
+                                                textIgnorePlacement(true),
+                                                textAllowOverlap(true)
+                                            )
+                                    )
+
+                                    // ── Layer 4: Individual unclustered glow ────────────────────
                                     style.addLayer(
                                         CircleLayer("threats-glow", "threats")
+                                            .withFilter(Expression.not(has("point_count")))
                                             .withProperties(
                                                 circleRadius(14f),
                                                 circleColor(get("color")),
@@ -472,21 +530,36 @@ fun ThreatRadarMapCard(locations: List<ThreatLocation>, modifier: Modifier = Mod
                                                 circleBlur(1f)
                                             )
                                     )
+
+                                    // ── Layer 5: Individual unclustered dot ─────────────────────
                                     style.addLayer(
                                         CircleLayer("threats-dot", "threats")
+                                            .withFilter(Expression.not(has("point_count")))
                                             .withProperties(
-                                                circleRadius(6f),
+                                                circleRadius(7f),
                                                 circleColor(get("color")),
                                                 circleStrokeColor("#FFFFFF"),
-                                                circleStrokeWidth(1.5f)
+                                                circleStrokeWidth(2f)
                                             )
                                     )
 
+                                    // ── Click handler ───────────────────────────────────────────
                                     map.addOnMapClickListener { point ->
                                         val screenPoint = map.projection.toScreenLocation(point)
-                                        val features = map.queryRenderedFeatures(screenPoint, "threats-dot")
-                                        if (features.isNotEmpty()) {
-                                            val idx = features[0].getNumberProperty("index")?.toInt() ?: 0
+
+                                        // Tap on cluster → zoom into it
+                                        val clusterFeatures = map.queryRenderedFeatures(screenPoint, "cluster-circle")
+                                        if (clusterFeatures.isNotEmpty()) {
+                                            map.animateCamera(
+                                                CameraUpdateFactory.newLatLngZoom(point, map.cameraPosition.zoom + 2.5)
+                                            )
+                                            return@addOnMapClickListener true
+                                        }
+
+                                        // Tap on individual dot → show detail panel
+                                        val dotFeatures = map.queryRenderedFeatures(screenPoint, "threats-dot")
+                                        if (dotFeatures.isNotEmpty()) {
+                                            val idx = dotFeatures[0].getNumberProperty("index")?.toInt() ?: 0
                                             if (idx < filteredLocations.size) {
                                                 val threat = filteredLocations[idx]
                                                 selectedThreat = threat
@@ -521,10 +594,14 @@ fun ThreatRadarMapCard(locations: List<ThreatLocation>, modifier: Modifier = Mod
                                             "medium" -> "#FFA500"
                                             else -> "#00CC66"
                                         })
+                                        addProperty("severity", when (priorityStr) {
+                                            "critical" -> 4; "high" -> 3; "medium" -> 2; else -> 1
+                                        })
                                         addProperty("score", loc.threatScore ?: 0)
                                         addProperty("index", idx)
                                     }
                                     Feature.fromGeometry(
+                                        // No jitter — exact coordinates, clustering handles overlaps
                                         Point.fromLngLat(loc.longitude ?: 0.0, loc.latitude ?: 0.0),
                                         props
                                     )
