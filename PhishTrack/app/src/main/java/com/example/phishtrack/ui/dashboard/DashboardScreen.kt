@@ -711,7 +711,7 @@ fun ThreatRadarMapCard(locations: List<ThreatLocation>, modifier: Modifier = Mod
         }
     }
 }
-
+}
 
 @Composable
 private fun MapZoomButton(label: String, onClick: () -> Unit) {
