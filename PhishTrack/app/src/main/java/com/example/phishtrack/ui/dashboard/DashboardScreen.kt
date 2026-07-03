@@ -397,6 +397,7 @@ fun ThreatRadarMapCard(locations: List<ThreatLocation>, modifier: Modifier = Mod
                     factory = { ctx ->
                         MapLibre.getInstance(ctx)
                         MapView(ctx).also { mv ->
+                            mv.onCreate(null)
                             val observer = LifecycleEventObserver { _, event ->
                                 when (event) {
                                     Lifecycle.Event.ON_START   -> mv.onStart()
@@ -408,8 +409,6 @@ fun ThreatRadarMapCard(locations: List<ThreatLocation>, modifier: Modifier = Mod
                                 }
                             }
                             lifecycle.addObserver(observer)
-                            mv.onCreate(null)
-                            mv.onStart()
 
                             mv.getMapAsync { map ->
                                 mapRef = map
