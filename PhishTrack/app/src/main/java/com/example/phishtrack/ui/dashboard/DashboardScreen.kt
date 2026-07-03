@@ -396,7 +396,8 @@ fun ThreatRadarMapCard(locations: List<ThreatLocation>, modifier: Modifier = Mod
                     modifier = Modifier.fillMaxSize(),
                     factory = { ctx ->
                         MapLibre.getInstance(ctx)
-                        MapView(ctx).also { mv ->
+                        val options = org.maplibre.android.maps.MapLibreMapOptions.createFromAttributes(ctx).textureMode(true)
+                        MapView(ctx, options).also { mv ->
                             mv.onCreate(null)
                             val observer = LifecycleEventObserver { _, event ->
                                 when (event) {
