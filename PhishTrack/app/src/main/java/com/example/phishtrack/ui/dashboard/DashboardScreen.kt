@@ -382,11 +382,15 @@ fun ThreatRadarMapCard(locations: List<ThreatLocation>, modifier: Modifier = Mod
             colors = CardDefaults.cardColors(containerColor = Color(0xFF, 0xFF, 0xFF)),
             modifier = Modifier
                 .fillMaxWidth()
-                .height(240.dp)
+                .heightIn(min = 240.dp)  // map is at least 240dp, expands for detail panel
                 .border(1.dp, Color(0x2A, 0x35, 0x58), RoundedCornerShape(12.dp))
                 .clip(RoundedCornerShape(12.dp))
         ) {
-            Box(modifier = Modifier.fillMaxSize()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 240.dp)
+            ) {
                 AndroidView(
                     modifier = Modifier.fillMaxSize(),
                     factory = { ctx ->
@@ -696,11 +700,16 @@ fun ThreatRadarMapCard(locations: List<ThreatLocation>, modifier: Modifier = Mod
             }
         }
 
-        // ── Threat Detail Panel — BELOW map, never overlapping controls ──
-        if (selectedThreat != null) {
-            Spacer(modifier = Modifier.height(8.dp))
+        // ── Threat Detail Panel — rendered INSIDE the card, below the map ──
+        AnimatedVisibility(
+            visible = selectedThreat != null,
+            enter = fadeIn() + slideInVertically(initialOffsetY = { it }),
+            exit = fadeOut() + slideOutVertically(targetOffsetY = { it })
+        ) {
             selectedThreat?.let { threat ->
                 ThreatOverlay(threat) { selectedThreat = null }
+            }
+        }
             }
         }
     }
