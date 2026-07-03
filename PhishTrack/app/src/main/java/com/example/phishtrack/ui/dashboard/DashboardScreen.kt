@@ -58,10 +58,8 @@ import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
 import org.maplibre.android.style.expressions.Expression
 import org.maplibre.android.style.expressions.Expression.get
-import org.maplibre.android.style.expressions.Expression.eq
-import org.maplibre.android.style.expressions.Expression.literal
 import org.maplibre.android.style.expressions.Expression.has
-import org.maplibre.android.style.expressions.Expression.toNumber
+import org.maplibre.android.style.expressions.Expression.not
 import org.maplibre.android.style.layers.CircleLayer
 import org.maplibre.android.style.layers.SymbolLayer
 import org.maplibre.android.style.layers.PropertyFactory.*
@@ -419,10 +417,12 @@ fun ThreatRadarMapCard(locations: List<ThreatLocation>, modifier: Modifier = Mod
                                     .build()
 
                                 // Satellite map using ESRI World Imagery (free, no API key)
+                                // glyphs are required for SymbolLayer text labels
                                 val satelliteMapStyle = """
                                 {
                                   "version": 8,
                                   "name": "Satellite",
+                                  "glyphs": "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
                                   "sources": {
                                     "esri-satellite": {
                                       "type": "raster",
@@ -522,7 +522,7 @@ fun ThreatRadarMapCard(locations: List<ThreatLocation>, modifier: Modifier = Mod
                                     // ── Layer 4: Individual unclustered glow ────────────────────
                                     style.addLayer(
                                         CircleLayer("threats-glow", "threats")
-                                            .withFilter(Expression.not(has("point_count")))
+                                            .withFilter(not(has("point_count")))
                                             .withProperties(
                                                 circleRadius(14f),
                                                 circleColor(get("color")),
@@ -534,7 +534,7 @@ fun ThreatRadarMapCard(locations: List<ThreatLocation>, modifier: Modifier = Mod
                                     // ── Layer 5: Individual unclustered dot ─────────────────────
                                     style.addLayer(
                                         CircleLayer("threats-dot", "threats")
-                                            .withFilter(Expression.not(has("point_count")))
+                                            .withFilter(not(has("point_count")))
                                             .withProperties(
                                                 circleRadius(7f),
                                                 circleColor(get("color")),
