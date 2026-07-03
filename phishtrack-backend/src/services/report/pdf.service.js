@@ -391,32 +391,63 @@ exports.generatePdfReport = (data) => {
       }
 
       // Redirect chain
-      if (y > 680) { doc.addPage(); drawPageHeader('FORENSIC ARTIFACT ANALYSIS (CONT.)'); y = 45; }
-      y = sectionLabel('REDIRECT CHAIN TRACE', y);
+      if (y > 650) { doc.addPage(); drawPageHeader('FORENSIC ARTIFACT ANALYSIS (CONT.)'); y = 45; }
+      y = sectionLabel('NETWORK REDIRECT CHAIN TRACE', y);
       const chain = redirectChain;
+      
+      doc.rect(MARGIN, y, CONTENT_W, chain.length * 35 + 10).fill(c.lightBg);
+      y += 10;
+      
       chain.forEach((url, i) => {
         const isFinal = i === chain.length - 1;
-        const prefix = isFinal ? '[FINAL]' : `[HOP ${i + 1}]`;
-        doc.font('Courier-Bold').fontSize(7.5).fillColor(isFinal ? c.danger : c.accent)
-           .text(prefix, MARGIN, y);
+        const prefix = isFinal ? 'FINAL DESTINATION' : `HOP ${i + 1}`;
+        const color = isFinal ? c.danger : c.accent;
+        
+        // Hop pill
+        doc.rect(MARGIN + 10, y, 95, 14).fill(color);
+        doc.font('Helvetica-Bold').fontSize(6).fillColor(c.white)
+           .text(prefix, MARGIN + 10, y + 4, { width: 95, align: 'center' });
+           
+        // URL text
         doc.font('Courier').fontSize(7.5).fillColor(c.textDark)
-           .text(String(url), MARGIN + 55, y, { width: CONTENT_W - 55 });
-        y += 14;
+           .text(String(url), MARGIN + 115, y + 3, { width: CONTENT_W - 130, ellipsis: true });
+        
+        y += 18;
+        
+        // Arrow for next hop
+        if (!isFinal) {
+          doc.font('Helvetica').fontSize(10).fillColor(c.muted)
+             .text('↓', MARGIN + 53, y - 2);
+          y += 14;
+        }
       });
-      y += 10;
+      y += 20;
 
       // Screenshot
       const screenshot = screenshotData;
       if (screenshot && screenshot.startsWith('data:image/png;base64,')) {
-        if (y > 600) { doc.addPage(); drawPageHeader('EVIDENCE SCREENSHOT'); y = 45; }
-        y = sectionLabel('EVIDENCE SCREENSHOT (BROWSER SANDBOX CAPTURE)', y);
+        if (y > 500) { doc.addPage(); drawPageHeader('EVIDENCE SCREENSHOT'); y = 45; }
+        y = sectionLabel('VISUAL EVIDENCE (BROWSER SANDBOX CAPTURE)', y);
         try {
           const base64Data = screenshot.replace(/^data:image\/\w+;base64,/, '');
           const imgBuf = Buffer.from(base64Data, 'base64');
-          const maxH = Math.min(300, 780 - y - 20);
+          
+          // Outer forensic border
+          const maxH = Math.min(320, 780 - y - 30);
           if (maxH > 40) {
-            doc.image(imgBuf, MARGIN, y, { fit: [CONTENT_W, maxH], align: 'center', valign: 'center' });
-            y += maxH + 15;
+            // Draw dark background border
+            doc.rect(MARGIN, y, CONTENT_W, maxH).fill(c.navy);
+            doc.rect(MARGIN, y, CONTENT_W, maxH).stroke(c.border).lineWidth(2);
+            
+            // Render Image
+            doc.image(imgBuf, MARGIN + 2, y + 2, { fit: [CONTENT_W - 4, maxH - 4], align: 'center', valign: 'center' });
+            
+            // Add forensic overlay badge
+            doc.rect(MARGIN + 10, y + 10, 140, 18).fill('black');
+            doc.font('Courier-Bold').fontSize(8).fillColor(c.accent)
+               .text(`TS: ${new Date().toISOString().slice(0, 19)}Z`, MARGIN + 15, y + 15);
+               
+            y += maxH + 25;
           }
         } catch (_) {
           doc.font('Helvetica-Oblique').fontSize(9).fillColor(c.muted)
