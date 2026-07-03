@@ -11,6 +11,7 @@ router.get('/', cases.getAllCases);
 router.post('/', validate(schemas.createCase), cases.createCase);
 router.get('/:id', cases.getCaseById);
 router.put('/:id', validate(schemas.updateCase), cases.updateCase);
+router.patch('/:id/retention', cases.updateRetention);
 router.delete('/:id', cases.deleteCase);
 router.get('/:id/timeline', cases.getCaseTimeline);
 

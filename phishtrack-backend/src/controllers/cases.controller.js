@@ -166,6 +166,43 @@ exports.updateCase = async (req, res, next) => {
   }
 };
 
+exports.updateRetention = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { autoDelete } = req.body;
+
+    const existing = await prisma.case.findUnique({ where: { id } });
+    if (!existing) return res.status(404).json({ error: 'Not found' });
+    if (existing.userId !== req.user.userId) return res.status(403).json({ error: 'Access denied' });
+
+    let auto_delete_at = null;
+    if (autoDelete === true) {
+      // 30 days from now
+      const date = new Date();
+      date.setDate(date.getDate() + 30);
+      auto_delete_at = date;
+    }
+
+    const updated = await prisma.case.update({
+      where: { id },
+      data: { auto_delete_at }
+    });
+    
+    // Log audit
+    await prisma.auditLog.create({
+      data: {
+        userId: req.user.userId,
+        caseId: id,
+        action: autoDelete ? 'Scheduled for deletion (30 days)' : 'Retention policy removed (Permanent)',
+      }
+    });
+
+    res.json(updated);
+  } catch (err) {
+    next(err);
+  }
+};
+
 exports.deleteCase = async (req, res, next) => {
   try {
     const { id } = req.params;

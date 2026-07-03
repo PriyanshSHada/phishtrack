@@ -38,9 +38,10 @@ model Case {
   priority    Priority
   status      Status           @default(Open)
   tags        String[]
-  created_at  DateTime         @default(now())
-  updated_at  DateTime         @updatedAt
-  analyses    Analysis[]
+  created_at     DateTime         @default(now())
+  updated_at     DateTime         @updatedAt
+  auto_delete_at DateTime?
+  analyses       Analysis[]
   auditLogs   AuditLog[]
   user        User             @relation(fields: [userId], references: [id])
   custody     ChainOfCustody[]

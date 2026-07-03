@@ -35,15 +35,35 @@ exports.getRecentCases = async (req, res, next) => {
 exports.getWeeklyGraph = async (req, res, next) => {
   try {
     const userId = req.user.userId;
+    const { month, year } = req.query;
 
-    // 1. Get current week data (last 7 days including today)
+    let startDateStr;
+    let endDateStr;
+
+    if (month && year) {
+      // Month is 1-12. Construct the 1st day of the month.
+      const date = new Date(Date.UTC(parseInt(year), parseInt(month) - 1, 1));
+      startDateStr = date.toISOString().split('T')[0];
+      // Construct the last day of the month (day 0 of the next month)
+      const endDate = new Date(Date.UTC(parseInt(year), parseInt(month), 0));
+      endDateStr = endDate.toISOString().split('T')[0];
+    } else {
+      // Default: last 28 days
+      const today = new Date();
+      endDateStr = today.toISOString().split('T')[0];
+      const startDate = new Date();
+      startDate.setDate(today.getDate() - 27);
+      startDateStr = startDate.toISOString().split('T')[0];
+    }
+
+    // 1. Get graph data for the given date range
     const currentWeekRaw = await prisma.$queryRaw`
       SELECT
         TO_CHAR(d.date, 'YYYY-MM-DD') as date,
         COALESCE(COUNT(c.id), 0)::int as count
       FROM generate_series(
-        CURRENT_DATE - INTERVAL '27 days',
-        CURRENT_DATE,
+        ${startDateStr}::date,
+        ${endDateStr}::date,
         '1 day'::interval
       ) AS d(date)
       LEFT JOIN "Case" c ON DATE(c.created_at) = DATE(d.date) AND c."userId" = ${userId}
@@ -51,11 +71,14 @@ exports.getWeeklyGraph = async (req, res, next) => {
       ORDER BY d.date ASC;
     `;
 
-    // 2. Get totals for KPIs
+    // 2. Get totals for KPIs (We can adjust the totals to reflect the selected period or keep them as recent KPIs)
+    // If we want the KPIs to be based on the selected period:
     const totalThisWeekRes = await prisma.$queryRaw`
       SELECT COUNT(*)::int as total
       FROM "Case"
-      WHERE "userId" = ${userId} AND created_at >= CURRENT_DATE - INTERVAL '7 days';
+      WHERE "userId" = ${userId} 
+        AND DATE(created_at) >= ${startDateStr}::date 
+        AND DATE(created_at) <= ${endDateStr}::date;
     `;
     const totalThisWeek = totalThisWeekRes[0].total;
 
@@ -63,8 +86,8 @@ exports.getWeeklyGraph = async (req, res, next) => {
       SELECT COUNT(*)::int as total
       FROM "Case"
       WHERE "userId" = ${userId}
-        AND created_at >= CURRENT_DATE - INTERVAL '14 days'
-        AND created_at < CURRENT_DATE - INTERVAL '7 days';
+        AND DATE(created_at) >= (${startDateStr}::date - INTERVAL '7 days')
+        AND DATE(created_at) < ${startDateStr}::date;
     `;
     const totalLastWeek = totalLastWeekRes[0].total;
 
@@ -83,10 +106,14 @@ exports.getThreatMap = async (req, res, next) => {
     const userId = req.user.userId;
     const analyses = await prisma.analysis.findMany({
       where: {
-        case: { userId }
+        case: {
+          userId,
+          status: {
+            in: ['Open', 'Investigating']
+          }
+        }
       },
       orderBy: { analyzed_at: 'desc' },
-      take: 100,
       include: {
         case: {
           select: {

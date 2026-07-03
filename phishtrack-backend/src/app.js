@@ -34,6 +34,8 @@ app.use(rateLimitMiddleware({
 
 app.use(auditMiddleware());
 
+require('./services/cleanup.service');
+
 app.get('/', (req, res) => {
   res.json({ message: 'PhishTrack API is running successfully on Railway!' });
 });
