@@ -17,6 +17,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -29,6 +30,11 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontFamily
@@ -50,6 +56,7 @@ import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
+import org.maplibre.android.style.expressions.Expression.get
 import org.maplibre.android.style.layers.CircleLayer
 import org.maplibre.android.style.layers.PropertyFactory.*
 import org.maplibre.android.style.sources.GeoJsonSource
@@ -189,6 +196,9 @@ fun DashboardScreen(
                     val weeklyData = (weeklyGraphState as UiState.Success).data
                     WeeklyHeatmapSection(
                         weeklyData = weeklyData.currentWeek,
+                        selectedMonth = viewModel.selectedMonth.value,
+                        selectedYear = viewModel.selectedYear.value,
+                        onMonthYearSelected = viewModel::onMonthYearSelected,
                         onDateSelected = onDateFilterClick
                     )
                 }
@@ -204,6 +214,9 @@ fun DashboardScreen(
                 else -> {
                     WeeklyHeatmapSection(
                         weeklyData = emptyList(),
+                        selectedMonth = viewModel.selectedMonth.value,
+                        selectedYear = viewModel.selectedYear.value,
+                        onMonthYearSelected = viewModel::onMonthYearSelected,
                         onDateSelected = onDateFilterClick
                     )
                 }
@@ -341,11 +354,21 @@ fun MetricCard(title: String, value: String, color: Color, modifier: Modifier = 
 }
 
 @Composable
-fun ThreatRadarMapCard(locations: List<ThreatLocation>) {
+fun ThreatRadarMapCard(locations: List<ThreatLocation>, modifier: Modifier = Modifier) {
     val lifecycle = LocalLifecycleOwner.current.lifecycle
-    var mapRef by remember { mutableStateOf<org.maplibre.android.maps.MapLibreMap?>(null) }
     var selectedThreat by remember { mutableStateOf<ThreatLocation?>(null) }
-
+    var mapRef by remember { mutableStateOf<org.maplibre.android.maps.MapLibreMap?>(null) }
+    var searchQuery by remember { mutableStateOf("") }
+    
+    val filteredLocations = remember(searchQuery, locations) {
+        if (searchQuery.isBlank()) locations else {
+            locations.filter { 
+                it.ip?.contains(searchQuery, ignoreCase = true) == true || 
+                it.url?.contains(searchQuery, ignoreCase = true) == true || 
+                it.caseNumber?.contains(searchQuery, ignoreCase = true) == true 
+            }
+        }
+    }
     val hasRealData = locations.isNotEmpty()
 
     Column {
@@ -414,20 +437,23 @@ fun ThreatRadarMapCard(locations: List<ThreatLocation>) {
                                 """.trimIndent()
 
                                 map.setStyle(Style.Builder().fromJson(satelliteMapStyle)) { style ->
-                                    val features = locations.mapIndexedNotNull { idx, loc ->
+                                    val features = filteredLocations.mapIndexedNotNull { idx, loc ->
                                         if (loc.latitude != null && loc.longitude != null) {
                                             val props = JsonObject().apply {
-                                                val score = loc.threatScore ?: 0
-                                                addProperty("color", when {
-                                                    score >= 70 -> "#FF3B3B"
-                                                    score >= 40 -> "#FFA500"
-                                                    else        -> "#00CC66"
+                                                val priorityStr = (loc.priority ?: "Low").lowercase()
+                                                addProperty("color", when (priorityStr) {
+                                                    "critical", "high" -> "#FF3B3B"
+                                                    "medium" -> "#FFA500"
+                                                    else -> "#00CC66"
                                                 })
-                                                addProperty("score", score)
+                                                addProperty("score", loc.threatScore ?: 0)
                                                 addProperty("index", idx)
                                             }
+                                            // Add small random jitter so overlapping markers (same IP) are visible
+                                            val jitterLat = (Math.random() - 0.5) * 2.0
+                                            val jitterLng = (Math.random() - 0.5) * 2.0
                                             Feature.fromGeometry(
-                                                Point.fromLngLat(loc.longitude ?: 0.0, loc.latitude ?: 0.0),
+                                                Point.fromLngLat((loc.longitude ?: 0.0) + jitterLng, (loc.latitude ?: 0.0) + jitterLat),
                                                 props
                                             )
                                         } else null
@@ -441,7 +467,7 @@ fun ThreatRadarMapCard(locations: List<ThreatLocation>) {
                                         CircleLayer("threats-glow", "threats")
                                             .withProperties(
                                                 circleRadius(14f),
-                                                circleColor("{color}"),
+                                                circleColor(get("color")),
                                                 circleOpacity(0.25f),
                                                 circleBlur(1f)
                                             )
@@ -450,7 +476,7 @@ fun ThreatRadarMapCard(locations: List<ThreatLocation>) {
                                         CircleLayer("threats-dot", "threats")
                                             .withProperties(
                                                 circleRadius(6f),
-                                                circleColor("{color}"),
+                                                circleColor(get("color")),
                                                 circleStrokeColor("#FFFFFF"),
                                                 circleStrokeWidth(1.5f)
                                             )
@@ -461,8 +487,8 @@ fun ThreatRadarMapCard(locations: List<ThreatLocation>) {
                                         val features = map.queryRenderedFeatures(screenPoint, "threats-dot")
                                         if (features.isNotEmpty()) {
                                             val idx = features[0].getNumberProperty("index")?.toInt() ?: 0
-                                            if (idx < locations.size) {
-                                                val threat = locations[idx]
+                                            if (idx < filteredLocations.size) {
+                                                val threat = filteredLocations[idx]
                                                 selectedThreat = threat
                                                 map.animateCamera(
                                                     CameraUpdateFactory.newLatLngZoom(
@@ -482,6 +508,33 @@ fun ThreatRadarMapCard(locations: List<ThreatLocation>) {
                     }
                 )
 
+                LaunchedEffect(filteredLocations, mapRef) {
+                    mapRef?.getStyle { style ->
+                        val source = style.getSourceAs<GeoJsonSource>("threats")
+                        if (source != null) {
+                            val features = filteredLocations.mapIndexedNotNull { idx, loc ->
+                                if (loc.latitude != null && loc.longitude != null) {
+                                    val props = JsonObject().apply {
+                                        val priorityStr = (loc.priority ?: "Low").lowercase()
+                                        addProperty("color", when (priorityStr) {
+                                            "critical", "high" -> "#FF3B3B"
+                                            "medium" -> "#FFA500"
+                                            else -> "#00CC66"
+                                        })
+                                        addProperty("score", loc.threatScore ?: 0)
+                                        addProperty("index", idx)
+                                    }
+                                    Feature.fromGeometry(
+                                        Point.fromLngLat(loc.longitude ?: 0.0, loc.latitude ?: 0.0),
+                                        props
+                                    )
+                                } else null
+                            }
+                            source.setGeoJson(FeatureCollection.fromFeatures(features))
+                        }
+                    }
+                }
+
                 // Zoom buttons — top right (always on top of map, never behind overlay)
                 Column(
                     modifier = Modifier
@@ -498,23 +551,68 @@ fun ThreatRadarMapCard(locations: List<ThreatLocation>) {
                     }
                 }
 
-                // Status badge — top left (only when there is real data)
-                if (hasRealData) {
+                // Status badge & Search — top left
+                Column(modifier = Modifier.align(Alignment.TopStart).padding(8.dp)) {
+                    if (hasRealData) {
+                        Row(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(Color(0x0D, 0x14, 0x26).copy(alpha = 0.8f))
+                                .padding(horizontal = 8.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(modifier = Modifier.size(7.dp).background(Color(0x00, 0xFF, 0x88), CircleShape))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "LIVE: ${locations.size} SITES",
+                                color = Color(0x00, 0xFF, 0x88),
+                                fontSize = 9.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
                     Row(
+                        verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
-                            .align(Alignment.TopStart)
-                            .padding(8.dp)
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(Color(0x0D, 0x14, 0x26).copy(alpha = 0.8f))
-                            .padding(horizontal = 8.dp, vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                            .width(180.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color(0x0D, 0x14, 0x26).copy(alpha = 0.9f))
+                            .border(1.dp, Color(0x00, 0xF5, 0xFF).copy(alpha = 0.3f), RoundedCornerShape(8.dp))
+                            .padding(horizontal = 12.dp, vertical = 8.dp)
                     ) {
-                        Box(modifier = Modifier.size(7.dp).background(Color(0x00, 0xFF, 0x88), CircleShape))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = "LIVE: ${locations.size} SITES",
-                            color = Color(0x00, 0xFF, 0x88),
-                            fontSize = 9.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace
+                        Icon(
+                            imageVector = Icons.Default.Search,
+                            contentDescription = "Search",
+                            tint = Color(0x00, 0xF5, 0xFF),
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        BasicTextField(
+                            value = searchQuery,
+                            onValueChange = { query -> 
+                                searchQuery = query
+                            },
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                            keyboardActions = KeyboardActions(onSearch = {
+                                if (filteredLocations.isNotEmpty()) {
+                                    val match = filteredLocations.first()
+                                    selectedThreat = match
+                                    mapRef?.animateCamera(
+                                        CameraUpdateFactory.newLatLngZoom(
+                                            LatLng(match.latitude ?: 0.0, match.longitude ?: 0.0),
+                                            4.0
+                                        )
+                                    )
+                                }
+                            }),
+                            textStyle = TextStyle(color = Color.White, fontSize = 12.sp),
+                            singleLine = true,
+                            decorationBox = { innerTextField ->
+                                if (searchQuery.isEmpty()) {
+                                    Text("Search IP, URL, Case...", color = Color.Gray, fontSize = 12.sp)
+                                }
+                                innerTextField()
+                            }
                         )
                     }
                 }
@@ -896,7 +994,7 @@ fun CaseItemCard(case: CaseResponse, onClick: () -> Unit) {
                     fontWeight = FontWeight.Medium,
                     fontFamily = FontFamily.Monospace
                 )
-                Spacer(modifier = Modifier.height(2.dp))
+                Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = case.title,
                     color = Color.White,
