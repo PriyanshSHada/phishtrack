@@ -25,25 +25,31 @@ exports.getWhoisData = async (urlStr) => {
     let countryStr = 'Unknown';
 
     try {
-      // 1. Try free REST API (bypasses Render Port 43 block)
-      const res = await axios.get(`https://networkcalc.com/api/dns/whois/${domain}`, { timeout: 30000 });
-      if (res.data && res.data.status === 'OK' && res.data.whois) {
-        rawData = res.data.whois.record || JSON.stringify(res.data.whois);
+      // 1. Try API Ninjas WHOIS API
+      const apiKey = process.env.API_NINJAS_KEY;
+      if (!apiKey) throw new Error('API_NINJAS_KEY is missing');
+      
+      const res = await axios.get(`https://api.api-ninjas.com/v1/whois?domain=${domain}`, { 
+        headers: { 'X-Api-Key': apiKey },
+        timeout: 15000 
+      });
+      
+      if (res.data && !res.data.error && Object.keys(res.data).length > 0) {
+        rawData = JSON.stringify(res.data);
         
-        // Networkcalc parsed fields
-        if (res.data.whois.registry_created_date) creationDateStr = res.data.whois.registry_created_date;
-        else if (res.data.whois.created) creationDateStr = res.data.whois.created;
-        
-        if (res.data.whois.registry_expiration_date) expiryDateStr = res.data.whois.registry_expiration_date;
-        else if (res.data.whois.expires) expiryDateStr = res.data.whois.expires;
-        
-        if (res.data.whois.registrar) registrarStr = res.data.whois.registrar;
-        if (res.data.whois.registrant_country) countryStr = res.data.whois.registrant_country;
+        // API Ninjas returns UNIX timestamps
+        if (res.data.creation_date) {
+          creationDateStr = new Date(res.data.creation_date * 1000).toISOString();
+        }
+        if (res.data.expiration_date) {
+          expiryDateStr = new Date(res.data.expiration_date * 1000).toISOString();
+        }
+        if (res.data.registrar) registrarStr = res.data.registrar;
       } else {
-        throw new Error('REST API returned empty or invalid status');
+        throw new Error('API Ninjas returned empty or invalid status');
       }
     } catch (restErr) {
-      logger.warn('NetworkCalc WHOIS failed, falling back to raw whois', { error: restErr.message });
+      logger.warn('API Ninjas WHOIS failed, falling back to raw whois', { error: restErr.message });
       // 2. Fallback to raw port 43 whois lookup
       try {
         rawData = await lookupWhois(domain);
