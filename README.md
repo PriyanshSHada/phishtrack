@@ -103,11 +103,11 @@ npm run dev
 *(Replace these placeholders with actual screenshots from your Android device)*
 
 <div align="center">
-  <img src="https://via.placeholder.com/250x500.png?text=Dashboard" width="200" />
+  <img src="https://placehold.co/250x500/0a0a08/e8a33d?text=Dashboard" width="200" />
   &nbsp;&nbsp;&nbsp;&nbsp;
-  <img src="https://via.placeholder.com/250x500.png?text=Case+Analysis" width="200" />
+  <img src="https://placehold.co/250x500/0a0a08/e8a33d?text=Case+Analysis" width="200" />
   &nbsp;&nbsp;&nbsp;&nbsp;
-  <img src="https://via.placeholder.com/250x500.png?text=AI+Forensics" width="200" />
+  <img src="https://placehold.co/250x500/0a0a08/e8a33d?text=AI+Forensics" width="200" />
 </div>
 
 ---
