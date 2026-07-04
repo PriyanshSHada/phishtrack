@@ -13,10 +13,26 @@ async function lookupWhois(domain) {
   });
 }
 
+const net = require('net');
+
 exports.getWhoisData = async (urlStr) => {
   try {
     const urlObj = new URL(urlStr);
     const domain = urlObj.hostname.replace(/^www\./, '');
+
+    // Skip WHOIS if it's a raw IP address
+    if (net.isIP(domain)) {
+      return {
+        domain: domain,
+        raw_text: `WHOIS lookup skipped for raw IP address: ${domain}`,
+        creation_date: null,
+        expiry_date: null,
+        registrar: 'N/A',
+        registrant_country: 'N/A',
+        isSuspiciousAge: false,
+        daysOld: 9999
+      };
+    }
 
     let rawData = '';
     let creationDateStr = null;

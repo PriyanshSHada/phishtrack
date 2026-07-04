@@ -31,15 +31,20 @@ exports.runAnalysis = async (req, res, next) => {
     let sandbox = {};
 
     if (isIpCase && targetIp) {
-      const [ipgeoResult, virustotalResult, sandboxResult] = await Promise.allSettled([
-        ipgeoService.getIpGeoDataFromIp(targetIp),
-        virustotalService.getVirusTotalIpResult(targetIp),
-        puppeteerService.runSandbox(url)
-      ]);
-
-      ipGeo = ipgeoResult.status === 'fulfilled' && ipgeoResult.value !== null ? ipgeoResult.value : null;
-      virustotal = virustotalResult.status === 'fulfilled' ? virustotalResult.value : null;
-      sandbox = sandboxResult.status === 'fulfilled' ? sandboxResult.value : {};
+      if (sandboxResult.status === 'fulfilled' && sandboxResult.value?.status === 'DEAD_LINK') {
+        logger.warn(`Skipping IP Geo and VirusTotal for DEAD_LINK: ${url}`, { service: 'phishtrack-api' });
+        ipGeo = null;
+        virustotal = null;
+        sandbox = sandboxResult.value;
+      } else {
+        const [ipgeoResult, virustotalResult] = await Promise.allSettled([
+          ipgeoService.getIpGeoDataFromIp(targetIp),
+          virustotalService.getVirusTotalIpResult(targetIp)
+        ]);
+        ipGeo = ipgeoResult.status === 'fulfilled' && ipgeoResult.value !== null ? ipgeoResult.value : null;
+        virustotal = virustotalResult.status === 'fulfilled' ? virustotalResult.value : null;
+        sandbox = sandboxResult.status === 'fulfilled' ? sandboxResult.value : {};
+      }
 
       if (ipGeo) {
         whois = {
@@ -54,31 +59,35 @@ exports.runAnalysis = async (req, res, next) => {
         };
       }
     } else {
-      const [
-        whoisResult,
-        ipgeoResult,
-        sslResult,
-        virustotalResult,
-        similarityResult,
-        homographResult,
-        sandboxResult
-      ] = await Promise.allSettled([
-        whoisService.getWhoisData(url),
-        ipgeoService.getIpGeoData(url),
-        sslService.getSslInfo(url),
-        virustotalService.getVirusTotalResult(url),
-        domainCheckService.checkSimilarity(url),
-        homographService.detectHomographAttack(url),
-        puppeteerService.runSandbox(url)
-      ]);
+      const sandboxResult = await puppeteerService.runSandbox(url);
+      sandbox = sandboxResult;
 
-      whois = whoisResult.status === 'fulfilled' && !whoisResult.value?.error ? whoisResult.value : null;
-      ipGeo = ipgeoResult.status === 'fulfilled' && ipgeoResult.value !== null ? ipgeoResult.value : null;
-      ssl = sslResult.status === 'fulfilled' ? sslResult.value : { valid: false, error: 'SSL check failed' };
-      virustotal = virustotalResult.status === 'fulfilled' ? virustotalResult.value : null;
-      similarity = similarityResult.status === 'fulfilled' ? similarityResult.value : null;
-      homograph = homographResult.status === 'fulfilled' ? homographResult.value : null;
-      sandbox = sandboxResult.status === 'fulfilled' ? sandboxResult.value : {};
+      if (sandbox.status === 'DEAD_LINK') {
+        logger.warn(`Skipping WHOIS, IP Geo, SSL, VirusTotal, Similarity, Homograph for DEAD_LINK: ${url}`, { service: 'phishtrack-api' });
+      } else {
+        const [
+          whoisResult,
+          ipgeoResult,
+          sslResult,
+          virustotalResult,
+          similarityResult,
+          homographResult
+        ] = await Promise.allSettled([
+          whoisService.getWhoisData(url),
+          ipgeoService.getIpGeoData(url),
+          sslService.getSslInfo(url),
+          virustotalService.getVirusTotalResult(url),
+          domainCheckService.checkSimilarity(url),
+          homographService.detectHomographAttack(url)
+        ]);
+
+        whois = whoisResult.status === 'fulfilled' && !whoisResult.value?.error ? whoisResult.value : null;
+        ipGeo = ipgeoResult.status === 'fulfilled' && ipgeoResult.value !== null ? ipgeoResult.value : null;
+        ssl = sslResult.status === 'fulfilled' ? sslResult.value : { valid: false, error: 'SSL check failed' };
+        virustotal = virustotalResult.status === 'fulfilled' ? virustotalResult.value : null;
+        similarity = similarityResult.status === 'fulfilled' ? similarityResult.value : null;
+        homograph = homographResult.status === 'fulfilled' ? homographResult.value : null;
+      }
     }
 
     const analysisData = {
@@ -94,6 +103,16 @@ exports.runAnalysis = async (req, res, next) => {
     };
 
     const aiResult = await openaiService.analyzeWithAi(analysisData);
+
+    // Safety Net: Override AI if VirusTotal is heavily flagging the site
+    const vtMalicious = virustotal?.maliciousCount || 0;
+    if (vtMalicious >= 5 && aiResult.threat_score < 70) {
+      aiResult.threat_score = Math.max(aiResult.threat_score, 85);
+      aiResult.verdict = 'Malware Distribution';
+      aiResult.severity = 'High';
+      aiResult.ai_summary = `[OVERRIDE] VirusTotal detected this target as malicious on ${vtMalicious} engines. ` + (aiResult.ai_summary || '');
+      aiResult.confidence = 99;
+    }
 
     const severityMap = {
       low: 'Low',
