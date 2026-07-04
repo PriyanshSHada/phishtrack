@@ -98,19 +98,7 @@ npm run dev
 
 ---
 
-## 📸 Screenshots
 
-*(Replace these placeholders with actual screenshots from your Android device)*
-
-<div align="center">
-  <img src="https://placehold.co/250x500/0a0a08/e8a33d?text=Dashboard" width="200" />
-  &nbsp;&nbsp;&nbsp;&nbsp;
-  <img src="https://placehold.co/250x500/0a0a08/e8a33d?text=Case+Analysis" width="200" />
-  &nbsp;&nbsp;&nbsp;&nbsp;
-  <img src="https://placehold.co/250x500/0a0a08/e8a33d?text=AI+Forensics" width="200" />
-</div>
-
----
 
 ## 🛡️ Disclaimer
 
