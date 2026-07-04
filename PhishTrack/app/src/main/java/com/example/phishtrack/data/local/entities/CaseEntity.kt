@@ -18,5 +18,6 @@ data class CaseEntity(
     val status: String,
     val tags: String, // Stored as comma-separated string for simplicity
     val createdAt: String,
-    val updatedAt: String
+    val updatedAt: String,
+    val autoDeleteAt: String? = null
 )

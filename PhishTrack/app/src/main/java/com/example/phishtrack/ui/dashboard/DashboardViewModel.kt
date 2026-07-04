@@ -35,11 +35,36 @@ class DashboardViewModel @Inject constructor(
     private val _weeklyGraphState = mutableStateOf<UiState<WeeklyDashboardResponse>>(UiState.Idle)
     val weeklyGraphState: State<UiState<WeeklyDashboardResponse>> = _weeklyGraphState
 
+    private val _selectedMonth = mutableStateOf<Int?>(null)
+    val selectedMonth: State<Int?> = _selectedMonth
+    private val _selectedYear = mutableStateOf<Int?>(null)
+    val selectedYear: State<Int?> = _selectedYear
+
+    fun onMonthYearSelected(month: Int?, year: Int?) {
+        _selectedMonth.value = month
+        _selectedYear.value = year
+        loadWeeklyGraph()
+    }
+
+    private fun loadWeeklyGraph() {
+        _weeklyGraphState.value = UiState.Loading
+        viewModelScope.launch {
+            casesRepository.getWeeklyGraph(_selectedMonth.value, _selectedYear.value).collect { result ->
+                result.fold(
+                    onSuccess = { _weeklyGraphState.value = UiState.Success(it) },
+                    onFailure = { 
+                        Log.e("Dashboard", "Error: ${it.message}", it)
+                        _weeklyGraphState.value = UiState.Error("An error occurred: ${it.message}") 
+                    }
+                )
+            }
+        }
+    }
+
     fun loadDashboardData() {
         _statsState.value = UiState.Loading
         _recentCasesState.value = UiState.Loading
         _threatMapState.value = UiState.Loading
-        _weeklyGraphState.value = UiState.Loading
 
         viewModelScope.launch {
             casesRepository.getStats().collect { result ->
@@ -77,17 +102,7 @@ class DashboardViewModel @Inject constructor(
             }
         }
 
-        viewModelScope.launch {
-            casesRepository.getWeeklyGraph().collect { result ->
-                result.fold(
-                    onSuccess = { _weeklyGraphState.value = UiState.Success(it) },
-                    onFailure = { 
-                        Log.e("Dashboard", "Error: ${it.message}", it)
-                        _weeklyGraphState.value = UiState.Error("An error occurred: ${it.message}") 
-                    }
-                )
-            }
-        }
+        loadWeeklyGraph()
     }
 
     /** Public alias for pull-to-refresh or manual reload from the UI */

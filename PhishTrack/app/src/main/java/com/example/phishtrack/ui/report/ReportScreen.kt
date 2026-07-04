@@ -175,11 +175,28 @@ fun ReportScreen(
                     titleContentColor = Color.White
                 ),
                 actions = {
-                    IconButton(onClick = { showDeleteDialog = true }) {
-                        Icon(
-                            Icons.Default.Delete,
-                            contentDescription = "Delete Case",
-                            tint = LocalExtendedColors.current.errorLight
+                    val isAutoDelete = (caseDetailState as? UiState.Success)?.data?.autoDeleteAt != null
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = if (isAutoDelete) "30d" else "Keep",
+                            color = if (isAutoDelete) LocalExtendedColors.current.errorLight else Color.Gray,
+                            fontSize = 12.sp,
+                            modifier = Modifier.padding(end = 4.dp)
+                        )
+                        Switch(
+                            checked = isAutoDelete,
+                            onCheckedChange = { checked ->
+                                if (checked) {
+                                    showDeleteDialog = true
+                                } else {
+                                    viewModel.setRetentionPolicy(false)
+                                }
+                            },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Color.White,
+                                checkedTrackColor = LocalExtendedColors.current.errorLight
+                            ),
+                            modifier = Modifier.padding(end = 8.dp)
                         )
                     }
                 }
@@ -191,16 +208,16 @@ fun ReportScreen(
         if (showDeleteDialog) {
             AlertDialog(
                 onDismissRequest = { showDeleteDialog = false },
-                title = { Text("Delete Case", color = Color.White) },
-                text = { Text("Permanently delete this case and all its analysis data?", color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                title = { Text("Enable Auto-Delete", color = Color.White) },
+                text = { Text("This report will be permanently deleted in 30 days. Are you sure you want to enable auto-delete?", color = MaterialTheme.colorScheme.onSurfaceVariant) },
                 confirmButton = {
                     Button(
                         onClick = {
                             showDeleteDialog = false
-                            viewModel.deleteCase()
+                            viewModel.setRetentionPolicy(true)
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-                    ) { Text("DELETE", color = Color.White) }
+                    ) { Text("ENABLE", color = Color.White) }
                 },
                 dismissButton = {
                     TextButton(onClick = { showDeleteDialog = false }) {
@@ -1005,7 +1022,8 @@ fun ReportScreen(
                             enabled = !isGenerating,
                             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                             shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier.weight(1f).height(48.dp)
+                            modifier = Modifier.weight(1f).height(48.dp),
+                            contentPadding = PaddingValues(horizontal = 4.dp)
                         ) {
                             if (isGenerating) {
                                 CircularProgressIndicator(
@@ -1018,7 +1036,9 @@ fun ReportScreen(
                                     text = if (generateFailed) "RETRY" else "COMPILE PDF",
                                     color = MaterialTheme.colorScheme.background,
                                     fontWeight = FontWeight.Bold,
-                                    fontSize = 11.sp
+                                    fontSize = 9.sp,
+                                    maxLines = 1,
+                                    textAlign = TextAlign.Center
                                 )
                             }
                         }
@@ -1043,7 +1063,8 @@ fun ReportScreen(
                                     1.dp,
                                     if (latestReport != null) LocalExtendedColors.current.success else MaterialTheme.colorScheme.surfaceVariant,
                                     RoundedCornerShape(8.dp)
-                                )
+                                ),
+                            contentPadding = PaddingValues(horizontal = 4.dp)
                         ) {
                             if (isDownloading) {
                                 CircularProgressIndicator(color = LocalExtendedColors.current.success, strokeWidth = 2.dp, modifier = Modifier.size(16.dp))
@@ -1052,7 +1073,9 @@ fun ReportScreen(
                                     text = "OPEN PDF",
                                     color = if (latestReport != null) LocalExtendedColors.current.success else Color(0x55, 0x55, 0x55),
                                     fontWeight = FontWeight.Bold,
-                                    fontSize = 11.sp
+                                    fontSize = 9.sp,
+                                    maxLines = 1,
+                                    textAlign = TextAlign.Center
                                 )
                             }
                         }
@@ -1070,9 +1093,17 @@ fun ReportScreen(
                             modifier = Modifier
                                 .weight(1f)
                                 .height(48.dp)
-                                .border(1.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(8.dp))
+                                .border(1.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(8.dp)),
+                            contentPadding = PaddingValues(horizontal = 4.dp)
                         ) {
-                            Text(text = "VERIFY", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                            Text(
+                                text = "VERIFY",
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 9.sp,
+                                maxLines = 1,
+                                textAlign = TextAlign.Center
+                            )
                         }
                     }
 

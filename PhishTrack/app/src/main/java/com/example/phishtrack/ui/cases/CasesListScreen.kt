@@ -165,7 +165,7 @@ fun CasesListScreen(
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
-                placeholder = { Text("Search by URL, IP, or Case Number...") },
+                placeholder = { Text("Search by Name, URL, IP, or Case...") },
                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search", tint = Color(0x88, 0x92, 0xB0)) },
                 singleLine = true,
                 colors = OutlinedTextFieldDefaults.colors(
@@ -323,8 +323,9 @@ fun CasesListScreen(
                     if (refreshState is UiState.Error) {
                         item {
                             val errorMsg = (refreshState as UiState.Error).message
-                            ErrorStateComponent(message = errorMsg, onRetry = { refresh() })
-                            Spacer(modifier = Modifier.height(8.dp))
+                            LaunchedEffect(errorMsg) {
+                                // Background sync failure while cases exist, can just be ignored or shown via snackbar in the future
+                            }
                         }
                     }
                     items(filteredCases, key = { it.id }) { case ->

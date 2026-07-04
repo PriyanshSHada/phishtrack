@@ -377,6 +377,77 @@ fun ThreatRadarMapCard(locations: List<ThreatLocation>, modifier: Modifier = Mod
     val hasRealData = locations.isNotEmpty()
 
     Column {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (hasRealData) {
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(Color(0x0D, 0x14, 0x26))
+                        .border(1.dp, Color(0x2A, 0x35, 0x58), RoundedCornerShape(6.dp))
+                        .padding(horizontal = 8.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(modifier = Modifier.size(7.dp).background(Color(0x00, 0xFF, 0x88), CircleShape))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = "LIVE: ${locations.size} SITES",
+                        color = Color(0x00, 0xFF, 0x88),
+                        fontSize = 10.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace
+                    )
+                }
+            } else {
+                Spacer(modifier = Modifier.width(8.dp))
+            }
+            
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(start = 12.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color(0x0D, 0x14, 0x26))
+                    .border(1.dp, Color(0x2A, 0x35, 0x58), RoundedCornerShape(8.dp))
+                    .padding(horizontal = 12.dp, vertical = 8.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Search,
+                    contentDescription = "Search",
+                    tint = Color(0x00, 0xF5, 0xFF),
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                BasicTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                    keyboardActions = KeyboardActions(onSearch = {
+                        if (filteredLocations.isNotEmpty()) {
+                            val match = filteredLocations.first()
+                            selectedThreat = match
+                            mapRef?.animateCamera(
+                                CameraUpdateFactory.newLatLngZoom(
+                                    LatLng(match.latitude ?: 0.0, match.longitude ?: 0.0),
+                                    4.0
+                                )
+                            )
+                        }
+                    }),
+                    textStyle = TextStyle(color = Color.White, fontSize = 12.sp),
+                    singleLine = true,
+                    decorationBox = { innerTextField ->
+                        if (searchQuery.isEmpty()) {
+                            Text("Search IP, URL, Case...", color = Color.Gray, fontSize = 12.sp)
+                        }
+                        innerTextField()
+                    }
+                )
+            }
+        }
+
         Card(
             shape = RoundedCornerShape(12.dp),
             colors = CardDefaults.cardColors(containerColor = Color(0x0D, 0x14, 0x26)),
@@ -398,6 +469,19 @@ fun ThreatRadarMapCard(locations: List<ThreatLocation>, modifier: Modifier = Mod
                         MapLibre.getInstance(ctx)
                         val options = org.maplibre.android.maps.MapLibreMapOptions.createFromAttributes(ctx).textureMode(true)
                         MapView(ctx, options).also { mv ->
+                            mv.setOnTouchListener { view, event ->
+                                when (event.action) {
+                                    android.view.MotionEvent.ACTION_DOWN,
+                                    android.view.MotionEvent.ACTION_MOVE -> {
+                                        view.parent?.requestDisallowInterceptTouchEvent(true)
+                                    }
+                                    android.view.MotionEvent.ACTION_UP,
+                                    android.view.MotionEvent.ACTION_CANCEL -> {
+                                        view.parent?.requestDisallowInterceptTouchEvent(false)
+                                    }
+                                }
+                                false
+                            }
                             mv.onCreate(null)
                             val observer = LifecycleEventObserver { _, event ->
                                 when (event) {
@@ -633,70 +717,6 @@ fun ThreatRadarMapCard(locations: List<ThreatLocation>, modifier: Modifier = Mod
                     }
                 }
 
-                // Status badge & Search — top left
-                Column(modifier = Modifier.align(Alignment.TopStart).padding(8.dp)) {
-                    if (hasRealData) {
-                        Row(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(Color(0x0D, 0x14, 0x26).copy(alpha = 0.8f))
-                                .padding(horizontal = 8.dp, vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Box(modifier = Modifier.size(7.dp).background(Color(0x00, 0xFF, 0x88), CircleShape))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = "LIVE: ${locations.size} SITES",
-                                color = Color(0x00, 0xFF, 0x88),
-                                fontSize = 9.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace
-                            )
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
-                            .width(180.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(Color(0x0D, 0x14, 0x26).copy(alpha = 0.9f))
-                            .border(1.dp, Color(0x00, 0xF5, 0xFF).copy(alpha = 0.3f), RoundedCornerShape(8.dp))
-                            .padding(horizontal = 12.dp, vertical = 8.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Search,
-                            contentDescription = "Search",
-                            tint = Color(0x00, 0xF5, 0xFF),
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        BasicTextField(
-                            value = searchQuery,
-                            onValueChange = { query -> 
-                                searchQuery = query
-                            },
-                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                            keyboardActions = KeyboardActions(onSearch = {
-                                if (filteredLocations.isNotEmpty()) {
-                                    val match = filteredLocations.first()
-                                    selectedThreat = match
-                                    mapRef?.animateCamera(
-                                        CameraUpdateFactory.newLatLngZoom(
-                                            LatLng(match.latitude ?: 0.0, match.longitude ?: 0.0),
-                                            4.0
-                                        )
-                                    )
-                                }
-                            }),
-                            textStyle = TextStyle(color = Color.White, fontSize = 12.sp),
-                            singleLine = true,
-                            decorationBox = { innerTextField ->
-                                if (searchQuery.isEmpty()) {
-                                    Text("Search IP, URL, Case...", color = Color.Gray, fontSize = 12.sp)
-                                }
-                                innerTextField()
-                            }
-                        )
-                    }
                 }
             }
             // ── Threat Panel — below map, inside Card, slides in smoothly ──
@@ -711,7 +731,6 @@ fun ThreatRadarMapCard(locations: List<ThreatLocation>, modifier: Modifier = Mod
             }
         }
     }
-}
 }
 
 @Composable

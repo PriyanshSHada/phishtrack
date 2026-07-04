@@ -94,6 +94,22 @@ class ReportViewModel @Inject constructor(
         }
     }
 
+    fun setRetentionPolicy(autoDelete: Boolean) {
+        val caseId = currentCaseId ?: return
+        viewModelScope.launch {
+            casesRepository.setRetentionPolicy(caseId, autoDelete).collect { result ->
+                result.fold(
+                    onSuccess = {
+                        loadData() // Refresh details to get new autoDeleteAt
+                    },
+                    onFailure = { err ->
+                        _uiEvent.send(UiEvent.ShowSnackbar("Failed to update retention: ${err.message}"))
+                    }
+                )
+            }
+        }
+    }
+
     fun deleteCase() {
         val caseId = currentCaseId ?: return
         _deleteState.value = UiState.Loading

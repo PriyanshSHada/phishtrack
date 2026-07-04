@@ -50,6 +50,9 @@ interface ApiService {
   @PUT("api/cases/{id}")
   suspend fun updateCase(@Path("id") id: String, @Body req: UpdateCaseRequest): CaseResponse
 
+  @PATCH("api/cases/{id}/retention")
+  suspend fun updateRetention(@Path("id") id: String, @Body req: UpdateRetentionRequest): CaseResponse
+
   @DELETE("api/cases/{id}")
   suspend fun deleteCase(@Path("id") id: String): MessageResponse
 
@@ -91,7 +94,10 @@ interface ApiService {
   suspend fun getThreatMap(): List<ThreatLocation>
 
   @GET("api/dashboard/weekly")
-  suspend fun getWeeklyGraph(): WeeklyDashboardResponse
+  suspend fun getWeeklyGraph(
+      @Query("month") month: Int? = null,
+      @Query("year") year: Int? = null
+  ): WeeklyDashboardResponse
 
   // --- Audit ---
   @GET("api/audit/logs")

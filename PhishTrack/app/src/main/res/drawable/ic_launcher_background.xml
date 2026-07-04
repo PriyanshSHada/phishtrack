@@ -1,22 +1,3 @@
 <?xml version="1.0" encoding="utf-8"?>
-<vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="108dp"
-    android:height="108dp"
-    android:viewportWidth="108"
-    android:viewportHeight="108">
-    <!-- Dark cyber background matching app theme -->
-    <path
-        android:fillColor="#0A0E1A"
-        android:pathData="M0,0h108v108h-108z" />
-    <!-- Subtle scan line effect -->
-    <path
-        android:fillColor="#00000000"
-        android:pathData="M0,36L108,36"
-        android:strokeWidth="0.4"
-        android:strokeColor="#33FFFFFF" />
-    <path
-        android:fillColor="#00000000"
-        android:pathData="M0,72L108,72"
-        android:strokeWidth="0.4"
-        android:strokeColor="#33FFFFFF" />
-</vector>
+<color xmlns:android="http://schemas.android.com/apk/res/android"
+    android:color="#FDFDFD" />

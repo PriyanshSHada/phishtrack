@@ -83,7 +83,8 @@ data class CaseResponse(
     val status: String, // Open, Investigating, Closed
     val tags: List<String> = emptyList(),
     @SerializedName("created_at") val createdAt: String,
-    @SerializedName("updated_at") val updatedAt: String
+    @SerializedName("updated_at") val updatedAt: String,
+    @SerializedName("auto_delete_at") val autoDeleteAt: String? = null
 ) {
     fun displayTarget(): String = when (targetType) {
         "IP" -> targetIp ?: url.orEmpty()
@@ -118,6 +119,7 @@ data class CaseDetailResponse(
     val tags: List<String> = emptyList(),
     @SerializedName("created_at") val createdAt: String?,
     @SerializedName("updated_at") val updatedAt: String?,
+    @SerializedName("auto_delete_at") val autoDeleteAt: String? = null,
     val analyses: List<AnalysisResponse>? = emptyList(),
     val reports: List<ReportResponse>? = emptyList(),
     val auditLogs: List<AuditLogResponse>? = emptyList()
@@ -132,6 +134,10 @@ data class UpdateCaseRequest(
     val status: String? = null,
     val priority: String? = null,
     val description: String? = null
+)
+
+data class UpdateRetentionRequest(
+    val autoDelete: Boolean
 )
 
 data class TimelineEvent(
@@ -239,7 +245,7 @@ data class AuditLogResponse(
     @SerializedName("ip_address") val ipAddress: String?,
     @SerializedName("device_id") val deviceId: String?,
     val timestamp: String?,
-    val metadata: JsonObject?
+    val metadata: com.google.gson.JsonElement?
 )
 
 data class ChainOfCustodyResponse(

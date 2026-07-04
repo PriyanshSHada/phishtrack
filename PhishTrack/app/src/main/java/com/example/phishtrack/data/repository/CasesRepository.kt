@@ -156,6 +156,25 @@ class CasesRepository @Inject constructor(
         }
     }
 
+    fun setRetentionPolicy(caseId: String, autoDelete: Boolean): Flow<Result<CaseResponse>> = flow {
+        try {
+            val response = apiService.updateRetention(caseId, UpdateRetentionRequest(autoDelete))
+            // Update local DB cache
+            val local = caseDao.getCaseById(caseId)
+            if (local != null) {
+                caseDao.updateCase(
+                    local.copy(
+                        autoDeleteAt = response.autoDeleteAt,
+                        updatedAt = response.updatedAt
+                    )
+                )
+            }
+            emit(Result.success(response))
+        } catch (e: Exception) {
+            emit(Result.failure(e))
+        }
+    }
+
     fun deleteCase(caseId: String): Flow<Result<MessageResponse>> = flow {
         try {
             val response = apiService.deleteCase(caseId)
@@ -286,14 +305,15 @@ class CasesRepository @Inject constructor(
         }
     }
 
-    fun getWeeklyGraph(): Flow<Result<WeeklyDashboardResponse>> = flow {
-        val cached = dashboardDao.getCacheById("weekly_graph")
+    fun getWeeklyGraph(month: Int? = null, year: Int? = null): Flow<Result<WeeklyDashboardResponse>> = flow {
+        val cacheKey = if (month != null && year != null) "weekly_graph_${month}_${year}" else "weekly_graph"
+        val cached = dashboardDao.getCacheById(cacheKey)
         if (cached != null) {
             emit(Result.success(gson.fromJson(cached.jsonPayload, WeeklyDashboardResponse::class.java)))
         }
         try {
-            val response = apiService.getWeeklyGraph()
-            dashboardDao.insertCache(DashboardCacheEntity("weekly_graph", gson.toJson(response), System.currentTimeMillis()))
+            val response = apiService.getWeeklyGraph(month, year)
+            dashboardDao.insertCache(DashboardCacheEntity(cacheKey, gson.toJson(response), System.currentTimeMillis()))
             emit(Result.success(response))
         } catch (e: Exception) {
             if (cached == null) emit(Result.failure(e))

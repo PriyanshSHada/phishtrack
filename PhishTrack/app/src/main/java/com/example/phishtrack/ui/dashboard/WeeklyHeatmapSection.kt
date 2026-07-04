@@ -38,6 +38,13 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.util.Locale
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.ui.window.Dialog
+import java.time.Month
+import java.time.YearMonth
 
 data class HeatmapDay(
     val date: String,
@@ -46,22 +53,49 @@ data class HeatmapDay(
 )
 
 fun buildHeatmapData(
-    weeklyData: List<WeeklyGraphData>
+    weeklyData: List<WeeklyGraphData>,
+    selectedMonth: Int?,
+    selectedYear: Int?
 ): List<HeatmapDay> {
     val countMap = weeklyData.associate { it.date to it.count }
     val today = LocalDate.now()
+    val todayStr = today.toString()
     val result = mutableListOf<HeatmapDay>()
 
-    for (i in 27 downTo 0) {
-        val date = today.minusDays(i.toLong())
-        val dateStr = date.toString() // "2026-06-03"
-        result.add(
-            HeatmapDay(
-                date = dateStr,
-                count = countMap[dateStr] ?: 0,
-                isToday = (i == 0)
+    if (selectedMonth != null && selectedYear != null) {
+        val date = LocalDate.of(selectedYear, selectedMonth, 1)
+        val maxDays = date.lengthOfMonth()
+        
+        val firstDayOfWeek = date.dayOfWeek.value
+        val paddingDays = firstDayOfWeek - 1 
+        
+        for (i in 0 until paddingDays) {
+            result.add(HeatmapDay("", -1, false))
+        }
+
+        for (i in 1..maxDays) {
+            val current = LocalDate.of(selectedYear, selectedMonth, i)
+            val dateStr = current.toString()
+            result.add(
+                HeatmapDay(
+                    date = dateStr,
+                    count = countMap[dateStr] ?: 0,
+                    isToday = (dateStr == todayStr)
+                )
             )
-        )
+        }
+    } else {
+        for (i in 27 downTo 0) {
+            val date = today.minusDays(i.toLong())
+            val dateStr = date.toString()
+            result.add(
+                HeatmapDay(
+                    date = dateStr,
+                    count = countMap[dateStr] ?: 0,
+                    isToday = (i == 0)
+                )
+            )
+        }
     }
     return result
 }
@@ -88,29 +122,47 @@ fun heatmapTextColor(count: Int): Color {
 @Composable
 fun WeeklyHeatmapSection(
     weeklyData: List<WeeklyGraphData>,
+    selectedMonth: Int?,
+    selectedYear: Int?,
+    onMonthYearSelected: (Int?, Int?) -> Unit,
     modifier: Modifier = Modifier,
     onDateSelected: (String) -> Unit
 ) {
-    val heatmapDays = remember(weeklyData) {
-        buildHeatmapData(weeklyData)
-    }
-    var selectedDay by remember(heatmapDays) { mutableStateOf<HeatmapDay?>(heatmapDays.lastOrNull()) }
+    var showMonthYearPicker by remember { mutableStateOf(false) }
 
-    val totalScans = remember(heatmapDays) { heatmapDays.sumOf { it.count } }
-    val activeDays = remember(heatmapDays) { heatmapDays.count { it.count > 0 } }
+    val heatmapDays = remember(weeklyData, selectedMonth, selectedYear) {
+        buildHeatmapData(weeklyData, selectedMonth, selectedYear)
+    }
+    var selectedDay by remember(heatmapDays) { mutableStateOf<HeatmapDay?>(heatmapDays.lastOrNull { it.count != -1 }) }
+
+    val totalScans = remember(heatmapDays) { heatmapDays.filter { it.count != -1 }.sumOf { it.count } }
+    val activeDays = remember(heatmapDays) { heatmapDays.filter { it.count != -1 }.count { it.count > 0 } }
     val currentStreak = remember(heatmapDays) {
         var streak = 0
         for (day in heatmapDays.reversed()) {
+            if (day.count == -1) continue
             if (day.count > 0) streak++ else break
         }
         streak
+    }
+
+    if (showMonthYearPicker) {
+        MonthYearPickerDialog(
+            currentMonth = selectedMonth,
+            currentYear = selectedYear,
+            onDismissRequest = { showMonthYearPicker = false },
+            onConfirm = { m, y ->
+                showMonthYearPicker = false
+                onMonthYearSelected(m, y)
+            }
+        )
     }
 
     Column(modifier = modifier) {
 
         // Section title
         Text(
-            text = "WEEKLY SCAN ANALYTICS",
+            text = "WEEKLY CASE ANALYTICS",
             style = MaterialTheme.typography.labelSmall,
             color = Color(0xFF8892B0),
             letterSpacing = 1.2.sp
@@ -138,16 +190,35 @@ fun WeeklyHeatmapSection(
                 ) {
                     Column {
                         Text(
-                            text = "Scan Heatmap",
+                            text = "Case Heatmap",
                             color = Color(0xFFE2E8F0),
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Medium
                         )
-                        Text(
-                            text = "Last 28 days",
-                            color = Color(0xFF8892B0),
-                            fontSize = 11.sp
-                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .clickable { showMonthYearPicker = true }
+                                .padding(vertical = 4.dp)
+                        ) {
+                            val headerText = if (selectedMonth != null && selectedYear != null) {
+                                "${Month.of(selectedMonth).getDisplayName(TextStyle.FULL, Locale.getDefault())} $selectedYear"
+                            } else {
+                                "Last 28 days"
+                            }
+                            Text(
+                                text = headerText,
+                                color = Color(0xFF8892B0),
+                                fontSize = 11.sp
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Icon(
+                                imageVector = Icons.Default.CalendarToday,
+                                contentDescription = "Select Month",
+                                tint = Color(0xFF00F5FF),
+                                modifier = Modifier.size(12.dp)
+                            )
+                        }
                     }
                     // Total pill
                     Box(
@@ -159,7 +230,7 @@ fun WeeklyHeatmapSection(
                             .padding(horizontal = 10.dp, vertical = 3.dp)
                     ) {
                         Text(
-                            text = "$totalScans scans",
+                            text = "$totalScans cases",
                             color = Color(0xFF00F5FF),
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Medium
@@ -169,14 +240,17 @@ fun WeeklyHeatmapSection(
 
                 Spacer(modifier = Modifier.height(14.dp))
 
-                // Day labels row — start from the actual day-of-week of 'today minus 27 days'
-                // so the column headers align with the data in the grid below.
+                // Day labels row
                 val dayLabels = listOf("M", "T", "W", "T", "F", "S", "S")
-                val startDayOfWeek = remember(heatmapDays) {
-                    if (heatmapDays.isNotEmpty()) {
-                        // Parse the first date and get its ISO day-of-week (1=Mon … 7=Sun)
-                        val firstDate = java.time.LocalDate.parse(heatmapDays.first().date)
-                        firstDate.dayOfWeek.value - 1 // 0-based index into dayLabels
+                val startDayOfWeek = remember(heatmapDays, selectedMonth) {
+                    if (selectedMonth != null) {
+                        0 // Fixed Mon-Sun for calendar view
+                    } else if (heatmapDays.isNotEmpty()) {
+                        val firstDateStr = heatmapDays.firstOrNull { it.count != -1 }?.date
+                        if (firstDateStr != null && firstDateStr.isNotEmpty()) {
+                            val firstDate = java.time.LocalDate.parse(firstDateStr)
+                            firstDate.dayOfWeek.value - 1
+                        } else 0
                     } else 0
                 }
                 Row(modifier = Modifier.fillMaxWidth()) {
@@ -194,7 +268,7 @@ fun WeeklyHeatmapSection(
 
                 Spacer(modifier = Modifier.height(4.dp))
 
-                // Heatmap grid — 4 rows x 7 columns = 28 days
+                // Heatmap grid
                 val weeks = heatmapDays.chunked(7)
                 weeks.forEach { week ->
                     Row(
@@ -202,57 +276,74 @@ fun WeeklyHeatmapSection(
                         horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         week.forEach { day ->
-                            val isSelected = selectedDay?.date == day.date
-                            val cellColor by animateColorAsState(
-                                targetValue = if (isSelected) Color(0xFF00F5FF) else heatmapColor(day.count),
-                                animationSpec = tween(durationMillis = 180),
-                                label = "heatmapCellColor"
-                            )
-                            val cellScale by animateFloatAsState(
-                                targetValue = if (isSelected) 1.08f else 1f,
-                                animationSpec = tween(durationMillis = 180),
-                                label = "heatmapCellScale"
-                            )
-                            val textColor = heatmapTextColor(day.count)
+                            if (day.count == -1) {
+                                Spacer(modifier = Modifier.weight(1f).aspectRatio(1f))
+                            } else {
+                                val isSelected = selectedDay?.date == day.date
+                                val cellColor by animateColorAsState(
+                                    targetValue = if (isSelected) Color(0xFF00F5FF) else heatmapColor(day.count),
+                                    animationSpec = tween(durationMillis = 180),
+                                    label = "heatmapCellColor"
+                                )
+                                val cellScale by animateFloatAsState(
+                                    targetValue = if (isSelected) 1.08f else 1f,
+                                    animationSpec = tween(durationMillis = 180),
+                                    label = "heatmapCellScale"
+                                )
+                                val textColor = heatmapTextColor(day.count)
 
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .aspectRatio(1f)
-                                    .scale(cellScale)
-                                    .background(
-                                        color = cellColor,
-                                        shape = RoundedCornerShape(4.dp)
-                                    )
-                                    .pointerInput(day) {
-                                        detectTapGestures(
-                                            onTap = {
-                                                selectedDay = day
-                                                onDateSelected(day.date)
-                                            },
-                                            onLongPress = {
-                                                selectedDay = day
-                                            }
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .aspectRatio(1f)
+                                        .scale(cellScale)
+                                        .background(
+                                            color = cellColor,
+                                            shape = RoundedCornerShape(4.dp)
                                         )
-                                    }
-                                    .then(
-                                        if (isSelected || day.isToday)
-                                            Modifier.border(
-                                                width = if (isSelected) 2.dp else 1.5.dp,
-                                                color = if (isSelected) Color.White else Color(0xFF00F5FF),
-                                                shape = RoundedCornerShape(4.dp)
+                                        .pointerInput(day) {
+                                            detectTapGestures(
+                                                onTap = {
+                                                    selectedDay = day
+                                                    onDateSelected(day.date)
+                                                },
+                                                onLongPress = {
+                                                    selectedDay = day
+                                                }
                                             )
-                                        else Modifier
-                                    ),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                if (day.count > 0) {
-                                    Text(
-                                        text = day.count.toString(),
-                                        color = if (isSelected) Color(0xFF0D1120) else textColor,
-                                        fontSize = 9.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
+                                        }
+                                        .then(
+                                            if (isSelected || day.isToday)
+                                                Modifier.border(
+                                                    width = if (isSelected) 2.dp else 1.5.dp,
+                                                    color = if (isSelected) Color.White else Color(0xFF00F5FF),
+                                                    shape = RoundedCornerShape(4.dp)
+                                                )
+                                            else Modifier
+                                        ),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    val dayOfMonth = day.date.substringAfterLast("-").toIntOrNull()?.toString() ?: ""
+                                    Box(modifier = Modifier.fillMaxSize()) {
+                                        Text(
+                                            text = dayOfMonth,
+                                            color = if (isSelected) Color(0xFF0D1120).copy(alpha = 0.7f) else Color(0xFF8892B0).copy(alpha = 0.6f),
+                                            fontSize = 8.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            modifier = Modifier
+                                                .align(Alignment.TopStart)
+                                                .padding(start = 4.dp, top = 2.dp)
+                                        )
+                                        if (day.count > 0) {
+                                            Text(
+                                                text = day.count.toString(),
+                                                color = if (isSelected) Color(0xFF0D1120) else textColor,
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                modifier = Modifier.align(Alignment.Center)
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -322,13 +413,13 @@ fun WeeklyHeatmapSection(
                 value = currentStreak.toString(),
                 label = "day streak"
             )
-            // Total scans
+            // Total cases
             StatMiniCard(
                 modifier = Modifier.weight(1f),
                 icon = Icons.Default.Search,
                 iconTint = Color(0xFF00F5FF),
                 value = totalScans.toString(),
-                label = "total scans"
+                label = "total cases"
             )
             // Active days
             StatMiniCard(
@@ -354,9 +445,9 @@ private fun HeatmapSelectionDetails(day: HeatmapDay) {
         } ?: day.date
     }
     val activityLabel = when {
-        day.count == 0 -> "No scans recorded"
-        day.count == 1 -> "1 scan recorded"
-        else -> "${day.count} scans recorded"
+        day.count == 0 -> "No cases recorded"
+        day.count == 1 -> "1 case recorded"
+        else -> "${day.count} cases recorded"
     }
     val statusColor = when {
         day.count == 0 -> Color(0xFF8892B0)
@@ -443,6 +534,140 @@ fun StatMiniCard(
                 color = Color(0xFF8892B0),
                 fontSize = 10.sp
             )
+        }
+    }
+}
+
+@Composable
+fun MonthYearPickerDialog(
+    currentMonth: Int?,
+    currentYear: Int?,
+    onDismissRequest: () -> Unit,
+    onConfirm: (Int?, Int?) -> Unit
+) {
+    val actualYear = LocalDate.now().year
+    val actualMonth = LocalDate.now().monthValue
+
+    val initialYear = currentYear ?: actualYear
+    val initialMonth = currentMonth ?: actualMonth
+    
+    var selectedYear by remember { mutableStateOf(initialYear) }
+    var selectedMonth by remember { mutableStateOf(initialMonth) }
+
+    Dialog(onDismissRequest = onDismissRequest) {
+        Box(
+            modifier = Modifier
+                .background(Color(0xFF141829), RoundedCornerShape(16.dp))
+                .border(1.dp, Color(0xFF1E2540), RoundedCornerShape(16.dp))
+                .padding(20.dp)
+        ) {
+            Column {
+                Text(
+                    text = "Select Month & Year",
+                    color = Color.White,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(bottom = 16.dp)
+                )
+
+                // Year Selector
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "<",
+                        color = Color(0xFF00F5FF),
+                        fontSize = 24.sp,
+                        modifier = Modifier
+                            .clickable { selectedYear-- }
+                            .padding(8.dp)
+                    )
+                    Text(
+                        text = selectedYear.toString(),
+                        color = Color.White,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = ">",
+                        color = if (selectedYear < actualYear) Color(0xFF00F5FF) else Color(0xFF1E2540),
+                        fontSize = 24.sp,
+                        modifier = Modifier
+                            .then(if (selectedYear < actualYear) Modifier.clickable { selectedYear++ } else Modifier)
+                            .padding(8.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Months Grid
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(3),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.height(200.dp)
+                ) {
+                    items(12) { index ->
+                        val month = index + 1
+                        val isSelected = month == selectedMonth
+                        val isFutureMonth = selectedYear == actualYear && month > actualMonth
+                        
+                        val monthName = Month.of(month).getDisplayName(TextStyle.SHORT, Locale.getDefault())
+                        
+                        val bgColor = when {
+                            isSelected -> Color(0xFF00F5FF)
+                            isFutureMonth -> Color(0xFF141829)
+                            else -> Color(0xFF1E2540)
+                        }
+                        
+                        val textColor = when {
+                            isSelected -> Color(0xFF0D1120)
+                            isFutureMonth -> Color(0xFF1E2540)
+                            else -> Color.White
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .background(color = bgColor, shape = RoundedCornerShape(8.dp))
+                                .then(if (isFutureMonth) Modifier else Modifier.clickable { selectedMonth = month })
+                                .padding(vertical = 12.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = monthName,
+                                color = textColor,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    Text(
+                        text = "Reset",
+                        color = Color(0xFF8892B0),
+                        modifier = Modifier
+                            .clickable { onConfirm(null, null) }
+                            .padding(8.dp)
+                    )
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Text(
+                        text = "OK",
+                        color = Color(0xFF00F5FF),
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier
+                            .clickable { onConfirm(selectedMonth, selectedYear) }
+                            .padding(8.dp)
+                    )
+                }
+            }
         }
     }
 }
