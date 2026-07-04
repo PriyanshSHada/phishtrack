@@ -31,11 +31,13 @@ exports.runAnalysis = async (req, res, next) => {
     let sandbox = {};
 
     if (isIpCase && targetIp) {
-      if (sandboxResult.status === 'fulfilled' && sandboxResult.value?.status === 'DEAD_LINK') {
+      const sandboxResult = await puppeteerService.runSandbox(url);
+      sandbox = sandboxResult;
+
+      if (sandbox.status === 'DEAD_LINK') {
         logger.warn(`Skipping IP Geo and VirusTotal for DEAD_LINK: ${url}`, { service: 'phishtrack-api' });
         ipGeo = null;
         virustotal = null;
-        sandbox = sandboxResult.value;
       } else {
         const [ipgeoResult, virustotalResult] = await Promise.allSettled([
           ipgeoService.getIpGeoDataFromIp(targetIp),
@@ -43,7 +45,6 @@ exports.runAnalysis = async (req, res, next) => {
         ]);
         ipGeo = ipgeoResult.status === 'fulfilled' && ipgeoResult.value !== null ? ipgeoResult.value : null;
         virustotal = virustotalResult.status === 'fulfilled' ? virustotalResult.value : null;
-        sandbox = sandboxResult.status === 'fulfilled' ? sandboxResult.value : {};
       }
 
       if (ipGeo) {
