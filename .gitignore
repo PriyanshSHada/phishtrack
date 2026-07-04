@@ -32,3 +32,13 @@ test_output.txt
 jest_full_output.txt
 *.pdf
 !docs/*.pdf
+
+# Test and Scratch Scripts
+*.ps1
+phishtrack-backend/batch_phishing_test_results.json
+phishtrack-backend/test_phishing_report.json
+phishtrack-backend/realphishing.text
+phishtrack-backend/test_*.js
+phishtrack-backend/delete_*.js
+phishtrack-backend/list_users.js
+icon/
