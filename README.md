@@ -1,105 +1,97 @@
-# PhishTrack – Phishing Threat Tracking & Analysis Console
-
-![Build Status](https://img.shields.io/badge/build-passing-brightgreen)
-![Platform](https://img.shields.io/badge/platform-Android-3DDC84)
-![Backend](https://img.shields.io/badge/backend-Node.js-339933)
-![License](https://img.shields.io/badge/license-MIT-blue)
-
-**PhishTrack** is an advanced, open-source **Cyber Security Intelligence and Phishing Detection platform**. Designed for security researchers, SOC analysts, and everyday users, it analyzes malicious domains, tracks phishing campaigns, and generates automated forensic reports in real-time. By leveraging **OSINT (Open Source Intelligence)** and **Generative AI**, PhishTrack provides enterprise-grade threat intelligence through a native Android application and a robust Node.js REST API.
-
----
-
-## 🚀 Key Features for Threat Intelligence
-
-- **Real-Time Phishing Analysis:** Deep-scan URLs and IPs with zero-latency OSINT (VirusTotal, WHOIS, IP Geolocation, SSL Certificates).
-- **Advanced Sandboxing & Fast Ping:** Deploy headless Puppeteer instances to bypass CAPTCHAs, follow malicious redirect chains, and quickly ping IP targets for liveness.
-- **Brand Protection & SafeNet:** Utilize Levenshtein distance for Typosquatting/Homograph detection, backed by a deterministic SafeNet Engine that overrides AI verdicts on heavily flagged malware targets.
-- **AI-Powered Forensics:** Integrates with Fireworks AI (Llama 3.1) to synthesize raw OSINT data into contextualized threat assessments and extract MITRE ATT&CK techniques.
-- **Chain-of-Custody Reporting:** Automatically generates and cryptographically signs PDF forensic reports (SHA-256 HMAC) for legal and incident response teams.
-- **Interactive Global Dashboard:** Visualize cyber threats with live MapLibre global radars and GitHub-style weekly heatmaps in a beautiful Dark-Mode UI.
-- **Secure Architecture:** Features enterprise-grade JWT authentication, Redis-backed rate limiting, and OTP email verification.
+<div align="center">
+  <h1 align="center">PhishTrack</h1>
+  <p align="center">
+    <strong>Advanced Cyber Security Intelligence & Phishing Detection Platform</strong>
+  </p>
+  <p align="center">
+    <img src="https://img.shields.io/badge/Status-Completed-success?style=for-the-badge" alt="Status" />
+    <img src="https://img.shields.io/badge/Platform-Android-3DDC84?style=for-the-badge&logo=android&logoColor=white" alt="Platform" />
+    <img src="https://img.shields.io/badge/Backend-Node.js-339933?style=for-the-badge&logo=nodedotjs&logoColor=white" alt="Backend" />
+    <img src="https://img.shields.io/badge/Database-Supabase-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white" alt="Database" />
+  </p>
+</div>
 
 ---
 
-## 🛠️ Tech Stack
-
-**Frontend (Android App)**
-- Kotlin & Jetpack Compose
-- MVVM Architecture & Hilt Dependency Injection
-- Retrofit (Networking), DataStore (Preferences)
-- Google Maps SDK for Threat Mapping
-
-**Backend (REST API)**
-- Node.js & Express.js (Deployed on Northflank)
-- Prisma ORM & Supabase (PostgreSQL)
-- Redis (Upstash) for Rate Limiting & OTP
-- Puppeteer (Headless Chrome Sandbox)
-- Fireworks AI (Llama 3.1 Analysis Engine)
+**PhishTrack** is an enterprise-grade, OSINT-powered digital forensics platform engineered for security researchers, SOC analysts, and everyday users. It is designed to instantly dissect, analyze, and report on phishing campaigns, malicious domains, and rogue IP infrastructure. By combining zero-latency open-source intelligence with advanced Generative AI and headless sandboxing, PhishTrack delivers contextualized threat intelligence directly to a native Android application.
 
 ---
 
-## 🏗️ System Architecture
+## 🎯 Core Capabilities
+
+- **Zero-Latency Threat Engine:** Simultaneously queries VirusTotal, WHOIS databases, IP Geolocation networks, and SSL Certificate authorities for instantaneous threat data.
+- **Brand Protection & Typosquatting:** Utilizes Levenshtein distance and Punycode analysis algorithms to detect sophisticated brand impersonation and homograph attacks.
+- **Puppeteer Sandboxing & Fast Ping:** Deploys headless browser instances to safely bypass CAPTCHAs, extract DOM footprints, and follow malicious redirect chains without endangering the analyst. Fast Ping ensures rapid liveness checks on IP targets.
+- **AI-Powered Threat Synthesis:** Integrates with Fireworks AI (Llama 3.1) to synthesize raw, chaotic OSINT data into actionable threat intelligence, automatically extracting MITRE ATT&CK techniques.
+- **Deterministic SafeNet Engine:** Automated failsafes that instantly override AI hallucinations or benign verdicts when severe heuristics (e.g., 5+ VirusTotal engines) confidently flag a target as malware.
+- **NIST-Aligned Forensics:** Automatically generates detailed, immutable PDF forensic reports for legal and incident response teams. Each report is cryptographically signed using a SHA-256 HMAC and stored securely on Supabase.
+- **Interactive Global Radar:** Visualizes cyber threats with live MapLibre global radars and GitHub-style weekly heatmaps within a beautiful, data-dense Dark-Mode UI.
+
+---
+
+## 🏗️ Technical Architecture
+
+PhishTrack employs a modern, decoupled microservice architecture, leveraging the best of native mobile development and scalable cloud infrastructure.
 
 ```mermaid
 graph TD
-    A[📱 Android App] -->|HTTPS REST API| B[Node.js Backend / Northflank]
-    B --> C[(Supabase PostgreSQL)]
-    B --> D[(Upstash Redis)]
+    A[📱 Native Android App] -->|HTTPS REST API / JWT| B[Node.js Backend / Northflank]
     
-    %% Third Party OSINT & AI Integrations
-    B -.-> E[Fireworks AI]
-    B -.-> F[VirusTotal API]
-    B -.-> G[Puppeteer Sandbox]
+    subgraph Data Layer
+        B --> C[(Supabase PostgreSQL)]
+        B --> D[(Upstash Redis / Rate Limiting)]
+    end
+    
+    subgraph Threat Intelligence OSINT
+        B -.-> E[VirusTotal API]
+        B -.-> F[Puppeteer Sandbox]
+        B -.-> G[Fireworks AI / Llama 3.1]
+    end
 ```
+
+### 💻 Tech Stack Highlights
+* **Frontend:** Kotlin, Jetpack Compose, MVVM Architecture, Hilt (DI), Retrofit, MapLibre.
+* **Backend:** Node.js, Express.js, Prisma ORM, deployed globally on Northflank.
+* **Storage & Caching:** Supabase (PostgreSQL / Blob Storage), Upstash Redis (OTP & Rate Limiting).
+* **Security:** Enterprise-grade JWT authentication, Redis-backed brute-force prevention, and SHA-256 HMAC hashing.
 
 ---
 
-## 📁 Repository Structure
-
-```text
-PhishTrack/
-├── PhishTrack/               # Native Android Application (Kotlin/Compose)
-├── phishtrack-backend/       # Node.js REST API & AI microservices
-├── docs/                     # Development plans, audits, and UI/UX notes
-├── README.md                 # Project documentation
-└── .gitignore                # Global ignore rules
-```
-
----
-
-## 💻 Getting Started
+## 🚀 Getting Started
 
 ### Prerequisites
-- Node.js v18+ and npm
-- Java JDK 17
-- Android Studio Ladybug (or higher)
+* **Node.js** (v18+)
+* **Java JDK 17** & **Android Studio Ladybug**
 
-### 1. Backend Setup
+### 1. Backend Deployment
 ```bash
+# Clone and enter the backend directory
 cd phishtrack-backend
 npm install
 
-# Copy environment template
+# Configure environment variables (Supabase, Upstash, Fireworks, VT)
 cp .env.example .env
 
-# Generate Prisma Client & Push DB Schema
+# Generate Prisma Client & Sync Schema
 npx prisma generate
 npx prisma db push
 
-# Start the dev server
+# Launch the API server
 npm run dev
 ```
 
-### 2. Android Setup
-1. Open the `PhishTrack` folder in Android Studio.
-2. Let Gradle sync and resolve all dependencies.
-3. In `ApiService.kt`, ensure `BASE_URL` points to your backend instance.
-4. Run the app on an Android Emulator (API 26+).
+### 2. Android Client Setup
+1. Open the `PhishTrack` folder in **Android Studio**.
+2. Allow Gradle to sync and resolve all dependencies.
+3. Open `ApiService.kt` and ensure the `BASE_URL` points to your Northflank deployment (or `localhost` if testing via emulator).
+4. Build and run the app on any device running API 26 or higher.
 
 ---
 
+## 🛡️ Legal & Ethical Disclaimer
 
+*PhishTrack is engineered strictly for authorized cybersecurity investigations, academic research, and defensive threat analysis. The developers assume no liability for misuse. Always ensure compliance with local and international cyber laws when interacting with live malicious infrastructure.*
 
-## 🛡️ Disclaimer
-
-*PhishTrack is designed for authorized cybersecurity investigations, research, and defensive analysis. Use responsibly and ensure compliance with local laws.*
+<div align="center">
+  <sub>Final Internship Submission // Case File: PhishTrack-2026 // End of Report</sub>
+</div>
