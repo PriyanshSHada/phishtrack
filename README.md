@@ -11,11 +11,13 @@
 
 ## 🚀 Key Features for Threat Intelligence
 
-- **Real-Time Phishing Analysis:** Deep-scan URLs and IPs using automated OSINT tools (Whois, IP Geolocation, SSL Certificate validation).
-- **AI-Powered Forensics:** Integrates with Fireworks AI for deep malware analysis, contextual threat assessments, and MITRE ATT&CK technique mapping.
-- **Chain-of-Custody Reporting:** Automatically generates and cryptographically signs PDF forensic reports for legal and incident response teams.
-- **Interactive Global Dashboard:** Visualize cyber threats with live heatmaps and weekly scan analytics presented in a beautiful Dark-Mode UI.
-- **Secure Architecture:** Features JWT-based authentication with OTP email verification to protect investigative data.
+- **Real-Time Phishing Analysis:** Deep-scan URLs and IPs with zero-latency OSINT (VirusTotal, WHOIS, IP Geolocation, SSL Certificates).
+- **Advanced Sandboxing & Fast Ping:** Deploy headless Puppeteer instances to bypass CAPTCHAs, follow malicious redirect chains, and quickly ping IP targets for liveness.
+- **Brand Protection & SafeNet:** Utilize Levenshtein distance for Typosquatting/Homograph detection, backed by a deterministic SafeNet Engine that overrides AI verdicts on heavily flagged malware targets.
+- **AI-Powered Forensics:** Integrates with Fireworks AI (Llama 3.1) to synthesize raw OSINT data into contextualized threat assessments and extract MITRE ATT&CK techniques.
+- **Chain-of-Custody Reporting:** Automatically generates and cryptographically signs PDF forensic reports (SHA-256 HMAC) for legal and incident response teams.
+- **Interactive Global Dashboard:** Visualize cyber threats with live MapLibre global radars and GitHub-style weekly heatmaps in a beautiful Dark-Mode UI.
+- **Secure Architecture:** Features enterprise-grade JWT authentication, Redis-backed rate limiting, and OTP email verification.
 
 ---
 
@@ -28,11 +30,11 @@
 - Google Maps SDK for Threat Mapping
 
 **Backend (REST API)**
-- Node.js & Express.js
+- Node.js & Express.js (Deployed on Northflank)
 - Prisma ORM & Supabase (PostgreSQL)
 - Redis (Upstash) for Rate Limiting & OTP
 - Puppeteer (Headless Chrome Sandbox)
-- Fireworks AI (LLM Analysis Engine)
+- Fireworks AI (Llama 3.1 Analysis Engine)
 
 ---
 
@@ -40,14 +42,14 @@
 
 ```mermaid
 graph TD
-    A[📱 Android App] -->|HTTPS REST API| B[Node.js Backend]
+    A[📱 Android App] -->|HTTPS REST API| B[Node.js Backend / Northflank]
     B --> C[(Supabase PostgreSQL)]
     B --> D[(Upstash Redis)]
     
     %% Third Party OSINT & AI Integrations
     B -.-> E[Fireworks AI]
     B -.-> F[VirusTotal API]
-    B -.-> G[ScreenshotOne]
+    B -.-> G[Puppeteer Sandbox]
 ```
 
 ---
