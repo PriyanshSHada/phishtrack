@@ -6,11 +6,7 @@ exports.getAllCases = async (req, res, next) => {
     const { status, priority, date, page, limit } = req.query;
     const where = { userId: req.user.userId };
     if (status) {
-      if (status === 'Open') {
-        where.status = { in: ['Open', 'Investigating'] };
-      } else {
-        where.status = status;
-      }
+      where.status = status;
     }
     if (priority) where.priority = priority;
     if (date) {

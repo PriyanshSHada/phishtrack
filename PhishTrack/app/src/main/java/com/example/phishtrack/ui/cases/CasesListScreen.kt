@@ -123,11 +123,16 @@ fun CasesListScreen(
         refresh()
     }
 
-    val filteredCases = remember(casesList, searchQuery, sortBy) {
+    val filteredCases = remember(casesList, searchQuery, sortBy, selectedStatus, selectedPriority) {
         var list = casesList.filter { case ->
-            case.caseNumber.contains(searchQuery, ignoreCase = true) ||
-            case.displayTarget().contains(searchQuery, ignoreCase = true) ||
-            (case.title ?: "").contains(searchQuery, ignoreCase = true)
+            val matchSearch = case.caseNumber.contains(searchQuery, ignoreCase = true) ||
+                case.displayTarget().contains(searchQuery, ignoreCase = true) ||
+                (case.title ?: "").contains(searchQuery, ignoreCase = true)
+            
+            val matchStatus = selectedStatus == "All" || case.status.equals(selectedStatus, ignoreCase = true)
+            val matchPriority = selectedPriority == "All" || case.priority.equals(selectedPriority, ignoreCase = true)
+            
+            matchSearch && matchStatus && matchPriority
         }
         list = when (sortBy) {
             "Priority" -> {
